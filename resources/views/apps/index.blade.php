@@ -8,53 +8,37 @@
                 border-radius:8px;padding:10px 16px;font-size:12.5px;margin-bottom:18px">
         <i class="bi bi-exclamation-triangle"></i>
         No ad accounts yet. Add a Google Ads Manager account on the
-        <a href="{{ url('/connections') }}" style="color:#fcd34d">Ad Accounts</a> page first, then link your apps to it here.
+        <a href="{{ url('/connections') }}" style="color:#fcd34d">Ad Accounts</a> page so a sync can pull data. Apps here are
+        matched to campaigns automatically by their App ID.
     </div>
     @endif
 
     {{-- Add / edit app --}}
     <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:22px">
-        <h5 style="color:#fff;margin:0 0 16px">
+        <h5 style="color:#fff;margin:0 0 6px">
             <i class="bi bi-{{ $editing ? 'pencil-square' : 'plus-circle' }}" style="color:var(--purple)"></i>
             {{ $editing ? 'Edit App' : 'Add App' }}
         </h5>
+        <p style="color:var(--text-muted);font-size:12px;margin:0 0 16px">
+            Just the app name and its App ID. When you sync an ad account, every campaign that promotes this App ID
+            is matched to it automatically and its data flows into the report and dashboard.
+        </p>
         <form method="post" action="{{ $editing ? url('/apps/'.$editing->id) : url('/apps') }}">
             @csrf
             @if ($editing) @method('PUT') @endif
 
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label">App Name</label>
                     <input type="text" name="name" class="form-control" required maxlength="150"
                            placeholder="e.g. SmartConnect Messages"
                            value="{{ old('name', $editing->name ?? '') }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label">App ID (Play package)</label>
                     <input type="text" name="package_id" class="form-control" required maxlength="191"
                            placeholder="com.example.app"
                            value="{{ old('package_id', $editing->package_id ?? '') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Ad Account</label>
-                    <select name="connection_id" class="form-select">
-                        <option value="">— none —</option>
-                        @foreach ($connections as $c)
-                        <option value="{{ $c->id }}" @selected(old('connection_id', $editing->connection_id ?? '') == $c->id)>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Google Ads Customer ID</label>
-                    <input type="text" name="google_ads_customer_id" class="form-control" maxlength="20"
-                           placeholder="123-456-7890 (the account running ads)"
-                           value="{{ old('google_ads_customer_id', $editing->google_ads_customer_id ?? '') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Campaign ID <small style="text-transform:none;color:#6b6b8a">(optional)</small></label>
-                    <input type="text" name="google_ads_campaign_id" class="form-control" maxlength="30"
-                           placeholder="leave blank = all campaigns"
-                           value="{{ old('google_ads_campaign_id', $editing->google_ads_campaign_id ?? '') }}">
                 </div>
             </div>
 
@@ -84,9 +68,6 @@
                     <tr>
                         <th>App</th>
                         <th>App ID</th>
-                        <th>Ad Account</th>
-                        <th>Customer ID</th>
-                        <th>Campaign</th>
                         <th>Data</th>
                         <th></th>
                     </tr>
@@ -96,18 +77,11 @@
                     <tr>
                         <td style="font-weight:600;color:#fff">{{ $app->name }}</td>
                         <td><code style="color:#a78bfa">{{ $app->package_id }}</code></td>
-                        <td>{{ $app->connection->name ?? '—' }}</td>
-                        <td>{{ $app->google_ads_customer_id ?: '—' }}</td>
-                        <td>{{ $app->google_ads_campaign_id ?: 'All' }}</td>
                         <td>
-                            @if ($app->connection && $app->connection->isConfigured() && $app->google_ads_customer_id)
-                                <span class="badge-profit" title="Google Ads connected — fetch will be enabled next">Ready to fetch</span>
-                            @elseif (!$app->connection)
-                                <span class="badge-nodata">No ad account</span>
-                            @elseif (!$app->google_ads_customer_id)
-                                <span class="badge-nodata">No Customer ID</span>
+                            @if (in_array($app->id, $syncedAppIds))
+                                <span class="badge-profit" title="Campaigns matched to this App ID have synced data">Synced</span>
                             @else
-                                <span class="badge-nodata">Account not configured</span>
+                                <span class="badge-nodata" title="No campaign promoting this App ID has been synced yet">Awaiting sync</span>
                             @endif
                         </td>
                         <td style="text-align:right;white-space:nowrap">
@@ -120,7 +94,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:26px">
+                    <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:26px">
                         No apps yet. Add your first app above.
                     </td></tr>
                     @endforelse

@@ -34,7 +34,6 @@ Route::middleware('auth.pin')->group(function () {
     // Sync All — pull every campaign from every accessible account
     Route::get('/sync-all', [SyncAllController::class, 'index'])->name('sync-all');
     Route::post('/sync-all', [SyncAllController::class, 'run'])->name('sync-all.run');
-    Route::post('/sync-all/app', [SyncAllController::class, 'runApp'])->name('sync-all.app');
 
     // Ad Accounts — Google Ads Manager connections (per-MCC credentials)
     Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');

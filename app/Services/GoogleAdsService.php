@@ -27,8 +27,11 @@ class GoogleAdsService
     /** Countries are refreshed once per Sync All run, not per account. */
     private bool $countriesSynced = false;
 
-    /** app lookup: customer_id => [campaign_id => app_id, '*' => app_id] */
-    private ?array $appIndex = null;
+    /** Tracked-app lookup, built once: normalised store App ID => apps.id */
+    private ?array $appByPackage = null;
+
+    /** Current account's campaign_id => store App ID (from app_campaign_setting). */
+    private array $campaignAppMap = [];
 
     private function setVersion(string $v): void
     {
@@ -78,7 +81,7 @@ class GoogleAdsService
         @set_time_limit(600);
 
         $this->countriesSynced = false;
-        $this->appIndex = null;
+        $this->appByPackage = null;
 
         $connections = Connection::where('active', true)->get()
             ->filter(fn ($c) => $c->isConfigured());
@@ -94,92 +97,6 @@ class GoogleAdsService
             } catch (\Throwable $e) {
                 $summary['errors'][] = "{$conn->name}: " . $e->getMessage();
             }
-        }
-
-        return $summary;
-    }
-
-    /**
-     * Sync a SINGLE tracked App: uses its connection + Google Ads customer id,
-     * restricted to its campaign id when one is set. Fast, targeted alternative
-     * to the full Sync All (only one account, one or all of its campaigns).
-     * Returns the same ['campaigns','accounts','daily','errors'] shape.
-     */
-    public function syncApp(App $app, string $start, string $end): array
-    {
-        $summary = ['campaigns' => 0, 'accounts' => 0, 'daily' => 0, 'errors' => []];
-        @set_time_limit(180);
-        $this->appIndex = null;
-
-        $conn = $app->connection;
-        if (!$conn || !$conn->isConfigured()) {
-            $summary['errors'][] = 'This app has no configured Ad Account. Set its Ad Account (with credentials) on the Apps page.';
-            return $summary;
-        }
-
-        $customerId = preg_replace('/\D/', '', (string) $app->google_ads_customer_id);
-        if ($customerId === '') {
-            $summary['errors'][] = 'This app has no Google Ads Customer ID. Add it on the Apps page.';
-            return $summary;
-        }
-        $campaignId = preg_replace('/\D/', '', (string) $app->google_ads_campaign_id) ?: null;
-
-        $token    = $this->accessToken($conn);
-        $devToken = $conn->developer_token;
-
-        // Try the login-customer-id candidates in order: cached managers, the
-        // connection's configured Login Customer ID, then direct (no header).
-        $configured = preg_replace('/\D/', '', (string) $conn->login_customer_id);
-        $cached     = array_filter(explode(',', (string) getSetting('gads_managers_' . $conn->id)));
-        $logins     = array_values(array_unique(array_merge($cached, $configured !== '' ? [$configured] : [], [''])));
-
-        $campaigns = null;
-        $usedLogin = '';
-        $lastError = 'account not reachable with the current credentials';
-        foreach ($logins as $login) {
-            try {
-                $campaigns = $this->fetchCampaigns($token, $devToken, $login, $customerId, $start, $end, $campaignId);
-                $usedLogin = $login;
-                break;
-            } catch (\Throwable $e) {
-                $lastError = $e->getMessage();
-            }
-        }
-
-        if ($campaigns === null) {
-            $summary['errors'][] = "acct {$customerId}: " . $lastError;
-            return $summary;
-        }
-
-        $summary['accounts'] = 1;
-
-        // Daily / per-country / bucketed rows (respecting the campaign filter).
-        try {
-            $daily = $this->fetchDailyGeoStats($token, $devToken, $usedLogin, $customerId, $start, $end, $campaignId);
-            $this->persistDailyStats($conn, $customerId, $app->name, $daily, $summary);
-        } catch (\Throwable $e) {
-            $summary['errors'][] = "acct {$customerId} (daily): " . $e->getMessage();
-        }
-
-        foreach ($campaigns as $c) {
-            CampaignStat::updateOrCreate(
-                ['connection_id' => $conn->id, 'customer_id' => $customerId, 'campaign_id' => $c['id']],
-                [
-                    'account_name'      => $app->name,
-                    'campaign_name'     => $c['name'],
-                    'status'            => $c['status'],
-                    'channel_type'      => $c['channel'],
-                    'period_start'      => $start,
-                    'period_end'        => $end,
-                    'cost'              => $c['cost'],
-                    'conversions'       => $c['conversions'],
-                    'conversions_value' => $c['conversions_value'],
-                    'impressions'       => $c['impressions'],
-                    'clicks'            => $c['clicks'],
-                    'synced_at'         => now(),
-                ]
-            );
-            $summary['campaigns']++;
         }
 
         return $summary;
@@ -213,13 +130,14 @@ class GoogleAdsService
 
         $targets       = [];   // customerId => ['login' => managerId, 'name' => ?]
         $foundManagers = [];
+        $managerIds    = [];   // every manager id seen — excluded from metric queries
         foreach ($candidates as $m) {
             // Already covered as a client of a discovered manager — skip the probe.
             if (isset($targets[$m]) && $targets[$m]['login'] !== $m) {
                 continue;
             }
             try {
-                $clients = $this->expandLeafAccounts($token, $devToken, $m);
+                $clients = $this->expandLeafAccounts($token, $devToken, $m, $managerIds);
             } catch (\Throwable $e) {
                 continue; // not usable as a login-customer-id (client account / no access)
             }
@@ -227,7 +145,8 @@ class GoogleAdsService
             foreach ($clients as $leaf) {
                 $targets[$leaf['id']] = ['login' => $m, 'name' => $leaf['name']];
             }
-            $targets[$m] ??= ['login' => $m, 'name' => null]; // manager may run campaigns too
+            // NB: the manager itself is NOT added as a target — manager accounts
+            // have no metrics (REQUESTED_METRICS_FOR_MANAGER), only their clients do.
         }
 
         if (!empty($foundManagers)) {
@@ -239,6 +158,13 @@ class GoogleAdsService
         // setting login-customer-id to a non-manager is what triggers PERMISSION_DENIED.
         foreach ($accessible as $cid) {
             $targets[$cid] ??= ['login' => '', 'name' => null]; // '' => omit login-customer-id
+        }
+
+        // Drop manager accounts — querying metrics on them just errors out.
+        foreach (array_keys($targets) as $tid) {
+            if (isset($managerIds[$tid])) {
+                unset($targets[$tid]);
+            }
         }
 
         // Discovery snapshot for the debug panel.
@@ -290,6 +216,15 @@ class GoogleAdsService
                 continue;
             }
 
+            // Map this account's campaigns to their target store App ID so the
+            // daily rows can be attached to the matching tracked App by package.
+            $this->campaignAppMap = [];
+            foreach ($campaigns as $c) {
+                if (!empty($c['app_id'])) {
+                    $this->campaignAppMap[$c['id']] = $c['app_id'];
+                }
+            }
+
             // Daily / per-country / bucketed rows for the Excel-style report.
             try {
                 $daily = $this->fetchDailyGeoStats($token, $devToken, $meta['login'], $customerId, $start, $end);
@@ -303,6 +238,11 @@ class GoogleAdsService
             $dbg['daily'] = ($summary['daily'] ?? 0) - $dailyBefore;
 
             foreach ($campaigns as $c) {
+                // Skip campaigns that don't promote a tracked App (matched by App ID).
+                if ($this->resolveAppId($c['id']) === null) {
+                    continue;
+                }
+
                 CampaignStat::updateOrCreate(
                     ['connection_id' => $conn->id, 'customer_id' => $customerId, 'campaign_id' => $c['id']],
                     [
@@ -431,7 +371,14 @@ class GoogleAdsService
         $history = [];
 
         foreach ($rows as $row) {
-            $appId    = $this->resolveAppId($customerId, $row['campaign_id']);
+            $appId = $this->resolveAppId($row['campaign_id']);
+
+            // Only store data for campaigns that belong to a tracked App (matched
+            // by App ID). Everything else from the account is ignored.
+            if ($appId === null) {
+                continue;
+            }
+
             $totalRev = $row['ad_rev'] + $row['convert_rev'] + $row['renew_rev'];
 
             $daily[] = [
@@ -494,26 +441,35 @@ class GoogleAdsService
             DB::table('daily_stat_history')->insert($chunk);
         }
 
-        $summary['daily'] += count($rows);
+        $summary['daily'] += count($daily);
     }
 
-    /** Map a campaign/account to a tracked App row (campaign match wins). */
-    private function resolveAppId(string $customerId, string $campaignId): ?int
+    /**
+     * Map a campaign to a tracked App by store App ID: the campaign's target app
+     * (campaign.app_campaign_setting.app_id) matched to apps.package_id. Returns
+     * null for campaigns with no app target or no matching tracked App.
+     */
+    private function resolveAppId(string $campaignId): ?int
     {
-        if ($this->appIndex === null) {
-            $this->appIndex = [];
-            foreach (App::whereNotNull('google_ads_customer_id')->get() as $app) {
-                $cid = $app->google_ads_customer_id;
-                if ($app->google_ads_campaign_id) {
-                    $this->appIndex[$cid]['c:' . $app->google_ads_campaign_id] = $app->id;
-                } else {
-                    $this->appIndex[$cid]['*'] = $app->id;
-                }
+        $storeAppId = $this->campaignAppMap[$campaignId] ?? null;
+        if ($storeAppId === null) {
+            return null;
+        }
+
+        if ($this->appByPackage === null) {
+            $this->appByPackage = [];
+            foreach (App::whereNotNull('package_id')->get() as $app) {
+                $this->appByPackage[$this->normPackage($app->package_id)] = $app->id;
             }
         }
-        return $this->appIndex[$customerId]['c:' . $campaignId]
-            ?? $this->appIndex[$customerId]['*']
-            ?? null;
+
+        return $this->appByPackage[$this->normPackage($storeAppId)] ?? null;
+    }
+
+    /** Normalise a store App ID / package for case-insensitive matching. */
+    private function normPackage(string $value): string
+    {
+        return strtolower(trim($value));
     }
 
     /** Refresh the geo-target-constant → country map from the API. */
@@ -602,8 +558,13 @@ class GoogleAdsService
         );
     }
 
-    /** Expand a (possibly manager) account into its non-manager client accounts. */
-    private function expandLeafAccounts(string $token, string $devToken, string $managerId): array
+    /**
+     * Expand a (possibly manager) account into its non-manager client accounts.
+     * Manager account ids found (including the account itself when it is a
+     * manager) are collected into $managerIds — metrics can't be queried on a
+     * manager, so callers must exclude them from the query targets.
+     */
+    private function expandLeafAccounts(string $token, string $devToken, string $managerId, array &$managerIds = []): array
     {
         $query = "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager
                   FROM customer_client
@@ -611,16 +572,33 @@ class GoogleAdsService
 
         $rows = $this->searchStream($token, $devToken, $managerId, $managerId, $query);
 
-        $leaves = [];
+        $leaves        = [];
+        $managesOthers = false;
         foreach ($rows as $r) {
-            if (data_get($r, 'customerClient.manager') === true) {
-                continue; // skip manager accounts — they have no campaigns
-            }
             $id = preg_replace('/\D/', '', (string) data_get($r, 'customerClient.id'));
-            if ($id !== '') {
-                $leaves[] = ['id' => $id, 'name' => data_get($r, 'customerClient.descriptiveName')];
+            if ($id === '') {
+                continue;
             }
+            // The self-row (the queried account) is ignored — whether it is a
+            // manager is decided below by whether it lists any other account.
+            if ($id === $managerId) {
+                continue;
+            }
+            $managesOthers = true; // it lists another account → it is a manager
+            if (data_get($r, 'customerClient.manager') === true) {
+                $managerIds[$id] = true; // sub-manager — no queryable metrics
+                continue;
+            }
+            $leaves[] = ['id' => $id, 'name' => data_get($r, 'customerClient.descriptiveName')];
         }
+
+        // An account that manages other accounts is a manager itself, so its own
+        // metrics can't be queried (REQUESTED_METRICS_FOR_MANAGER). Flag it so the
+        // caller drops it from the query targets.
+        if ($managesOthers) {
+            $managerIds[$managerId] = true;
+        }
+
         return $leaves;
     }
 
@@ -630,6 +608,7 @@ class GoogleAdsService
 
         $query = "SELECT campaign.id, campaign.name, campaign.status,
                          campaign.advertising_channel_type,
+                         campaign.app_campaign_setting.app_id,
                          metrics.cost_micros, metrics.conversions, metrics.conversions_value,
                          metrics.impressions, metrics.clicks
                   FROM campaign
@@ -646,6 +625,9 @@ class GoogleAdsService
                 'id' => $id, 'name' => data_get($r, 'campaign.name'),
                 'status' => data_get($r, 'campaign.status'),
                 'channel' => data_get($r, 'campaign.advertisingChannelType'),
+                // Store App ID this campaign promotes (App campaigns only); used to
+                // match the campaign's stats to a tracked App by package.
+                'app_id' => data_get($r, 'campaign.appCampaignSetting.appId'),
                 'cost' => 0, 'conversions' => 0, 'conversions_value' => 0, 'impressions' => 0, 'clicks' => 0,
             ];
             $out[$id]['cost']              += ((float) data_get($r, 'metrics.costMicros', 0)) / 1_000_000;

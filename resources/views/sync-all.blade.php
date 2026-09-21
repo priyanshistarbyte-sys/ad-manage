@@ -31,42 +31,12 @@
         </form>
     </div>
 
-    {{-- Sync a single app (its Ad Account + customer/campaign only) --}}
-    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:end;justify-content:space-between;
-                background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:18px 24px;margin-bottom:20px">
-        <div style="flex:1;min-width:260px">
-            <h6 style="color:#fff;margin:0 0 4px"><i class="bi bi-bullseye" style="color:var(--purple)"></i> Sync one app only</h6>
-            <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px">
-                Pull data for just one app — uses its connected Ad Account, Customer ID and (if set) Campaign ID.
-            </p>
-            <form method="post" action="{{ url('/sync-all/app') }}" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"
-                  onsubmit="this.querySelector('button').innerHTML='<i class=&quot;bi bi-hourglass-split&quot;></i> Syncing…';this.querySelector('button').disabled=true;">
-                @csrf
-                <select name="app_id" required class="form-select" style="max-width:340px"
-                        @if ($apps->isEmpty()) disabled @endif>
-                    <option value="">— select an app —</option>
-                    @foreach ($apps as $app)
-                        <option value="{{ $app->id }}"
-                            @if (!$app->connection_id || !$app->google_ads_customer_id) disabled @endif>
-                            {{ $app->name }}
-                            @if (!$app->connection_id) (no Ad Account)
-                            @elseif (!$app->google_ads_customer_id) (no Customer ID)
-                            @else — {{ $app->google_ads_customer_id }}{{ $app->google_ads_campaign_id ? ' / camp '.$app->google_ads_campaign_id : '' }}
-                            @endif
-                        </option>
-                    @endforeach
-                </select>
-                <button type="submit" class="btn-primary-custom" style="font-size:14px;padding:10px 18px"
-                        @if ($apps->isEmpty()) disabled @endif>
-                    <i class="bi bi-arrow-repeat"></i> Sync This App
-                </button>
-            </form>
-            @if ($apps->isEmpty())
-            <div style="color:#fbbf24;font-size:11.5px;margin-top:8px">
-                No apps yet — add one on the <a href="{{ url('/apps') }}" style="color:#fcd34d">Apps</a> page.
-            </div>
-            @endif
-        </div>
+    <div style="background:rgba(167,139,250,.06);border:1px solid #a78bfa33;border-radius:10px;
+                padding:12px 18px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px">
+        <i class="bi bi-info-circle" style="color:#a78bfa"></i>
+        Synced campaigns are matched to your apps automatically by <strong style="color:#fff">App ID</strong>
+        (the campaign's target Play package). Add apps on the
+        <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page — no customer or campaign IDs needed.
     </div>
 
     @if ($connections->isEmpty())

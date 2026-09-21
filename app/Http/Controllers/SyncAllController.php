@@ -7,7 +7,6 @@ use App\Models\CampaignStat;
 use App\Models\Connection;
 use App\Services\GoogleAdsService;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 
 class SyncAllController extends Controller
 {
@@ -27,35 +26,6 @@ class SyncAllController extends Controller
             'periodStart'  => Carbon::now()->startOfMonth()->toDateString(),
             'periodEnd'    => Carbon::now()->toDateString(),
         ]);
-    }
-
-    /** Sync just one selected app (its Ad Account + customer/campaign). */
-    public function runApp(Request $request, GoogleAdsService $ads)
-    {
-        $data = $request->validate(['app_id' => ['required', 'exists:apps,id']]);
-        $app  = App::findOrFail($data['app_id']);
-
-        $start = Carbon::now()->startOfMonth()->toDateString();
-        $end   = Carbon::now()->toDateString();
-
-        $r = $ads->syncApp($app, $start, $end);
-
-        $back = redirect('/sync-all');
-
-        if (!empty($r['campaigns']) || !empty($r['daily'])) {
-            $back->with('flash', sprintf(
-                'Synced “%s”: %d campaign(s) + %d daily row(s) for %s → %s.',
-                $app->name, $r['campaigns'] ?? 0, $r['daily'] ?? 0, $start, $end
-            ));
-        } elseif (empty($r['errors'])) {
-            $back->with('flash', "Sync finished for “{$app->name}” — no campaigns found this month.");
-        }
-
-        if (!empty($r['errors'])) {
-            $back->with('flash_error', "“{$app->name}” — " . implode(' | ', array_unique($r['errors'])));
-        }
-
-        return $back;
     }
 
     public function run(GoogleAdsService $ads)
