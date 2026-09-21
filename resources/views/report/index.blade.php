@@ -1,0 +1,176 @@
+@extends('layouts.app')
+
+@section('content')
+@php
+    $money = fn ($v) => number_format((float) $v, 2);
+    $num   = fn ($v) => number_format((float) $v);
+    $pct   = fn ($v) => number_format((float) $v, 0) . '%';
+    $q     = fn (array $extra = []) => http_build_query(array_merge(array_filter([
+                'app_id' => $filters['app_id'], 'campaign_id' => $filters['campaign_id'],
+                'geo_id' => $filters['geo_id'], 'from' => $filters['from'], 'to' => $filters['to'],
+            ], fn ($v) => $v !== null && $v !== ''), $extra));
+@endphp
+
+<div style="max-width:1400px;margin:0 auto">
+
+    {{-- Header --}}
+    <div class="dash-header" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+            <div class="dash-title" style="color:#fff"><i class="bi bi-table" style="color:var(--purple)"></i> Report</div>
+            <div class="dash-subtitle" style="color:var(--text-muted);font-size:12.5px">
+                {{ \Carbon\Carbon::parse($filters['from'])->format('d M Y') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
+                @if ($lastSynced) · <span style="font-size:11px">synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }}</span> @endif
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url('/report/export?' . $q()) }}" class="btn-primary-custom" style="background:#1a7f37;text-decoration:none">
+                <i class="bi bi-filetype-csv"></i> Export CSV
+            </a>
+            <a href="{{ url('/sync-all') }}" class="btn-primary-custom" style="text-decoration:none">
+                <i class="bi bi-arrow-repeat"></i> Sync
+            </a>
+        </div>
+    </div>
+
+    {{-- Filters (App / Date / Campaign / Country) --}}
+    <form method="get" action="{{ url('/report') }}" class="data-card" style="padding:14px 16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end">
+            <div>
+                <label class="form-label">Filter — App</label>
+                <select name="app_id" class="form-select">
+                    <option value="">All apps</option>
+                    @foreach ($options['apps'] as $app)
+                        <option value="{{ $app->id }}" @selected($filters['app_id'] == $app->id)>{{ $app->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Filter — Campaign</label>
+                <select name="campaign_id" class="form-select">
+                    <option value="">All campaigns</option>
+                    @foreach ($options['campaigns'] as $c)
+                        <option value="{{ $c->campaign_id }}" @selected($filters['campaign_id'] == $c->campaign_id)>
+                            {{ $c->campaign_name ?: $c->campaign_id }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Filter — Country</label>
+                <select name="geo_id" class="form-select">
+                    <option value="">All countries</option>
+                    @foreach ($options['countries'] as $c)
+                        <option value="{{ $c->geo_id }}" @selected($filters['geo_id'] === $c->geo_id)>{{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">From</label>
+                <input type="date" name="from" value="{{ $filters['from'] }}" class="form-control">
+            </div>
+            <div>
+                <label class="form-label">To</label>
+                <input type="date" name="to" value="{{ $filters['to'] }}" class="form-control">
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn-primary-custom" type="submit"><i class="bi bi-funnel"></i> Apply</button>
+                <a href="{{ url('/report') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted);align-self:center">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:16px">
+        {{-- Main daily table --}}
+        <div class="data-card">
+            <div class="data-card-header">
+                <span><i class="bi bi-calendar3"></i> Daily Performance</span>
+                <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} day(s)</span>
+            </div>
+            <div class="table-wrap">
+                <table class="ledger monthly" style="width:100%;white-space:nowrap">
+                    <thead>
+                        <tr>
+                            <th>DATE</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
+                            <th>AD_REV</th><th>CONVERT_REV</th><th>RENEW_REV</th>
+                            <th>TRIAL</th><th>TRIAL_CONV%</th><th>REPEAT</th>
+                            <th>INSTALL</th><th>CPI</th><th></th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($rows as $r)
+                        @php $d = \Carbon\Carbon::parse($r->date)->format('Y-m-d'); @endphp
+                        <tr>
+                            <td>{{ \Carbon\Carbon::parse($r->date)->format('d-m-Y') }}</td>
+                            <td>{{ $money($r->cost) }}</td>
+                            <td><span class="{{ $r->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($r->troas) }}</span></td>
+                            <td>{{ $money($r->total_rev) }}</td>
+                            <td>{{ $money($r->ad_rev) }}</td>
+                            <td>{{ $money($r->convert_rev) }}</td>
+                            <td>{{ $money($r->renew_rev) }}</td>
+                            <td>{{ $num($r->trial) }}</td>
+                            <td>{{ $pct($r->trial_convert_perc) }}</td>
+                            <td>{{ $num($r->repeat_count) }}</td>
+                            <td>{{ $num($r->install) }}</td>
+                            <td>{{ $money($r->cpi) }}</td>
+                            <td><a href="{{ url('/report/history?' . $q(['date' => $d])) }}" class="pill" style="text-decoration:none">VIEW HISTORY</a></td>
+                            <td><a href="{{ url('/report/country?' . $q(['date' => $d])) }}" class="pill" style="text-decoration:none">COUNTRY</a></td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:32px">
+                            No data for these filters. Run <a href="{{ url('/sync-all') }}" style="color:#a78bfa">Sync All</a> first.
+                        </td></tr>
+                        @endforelse
+                    </tbody>
+                    @if ($rows->isNotEmpty())
+                    <tfoot>
+                        <tr>
+                            <td>TOTAL</td>
+                            <td>{{ $money($totals->cost) }}</td>
+                            <td><span class="{{ $totals->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($totals->troas) }}</span></td>
+                            <td>{{ $money($totals->total_rev) }}</td>
+                            <td>{{ $money($totals->ad_rev) }}</td>
+                            <td>{{ $money($totals->convert_rev) }}</td>
+                            <td>{{ $money($totals->renew_rev) }}</td>
+                            <td>{{ $num($totals->trial) }}</td>
+                            <td>{{ $pct($totals->trial_convert_perc) }}</td>
+                            <td>{{ $num($totals->repeat_count) }}</td>
+                            <td>{{ $num($totals->install) }}</td>
+                            <td>{{ $money($totals->cpi) }}</td>
+                            <td></td><td></td>
+                        </tr>
+                    </tfoot>
+                    @endif
+                </table>
+            </div>
+        </div>
+
+        {{-- Country TROAS ranking --}}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+            @foreach (['profit' => ['Top Profit Countries (TROAS)', 'bi-graph-up-arrow', 'badge-profit'], 'loss' => ['Top Loss Countries (TROAS)', 'bi-graph-down-arrow', 'badge-loss']] as $key => [$title, $icon, $badge])
+            <div class="data-card">
+                <div class="data-card-header"><span><i class="bi {{ $icon }}"></i> {{ $title }}</span></div>
+                <div class="table-wrap">
+                    <table class="ledger" style="width:100%">
+                        <thead><tr><th>Country</th><th>Cost</th><th>Total Rev</th><th>TROAS</th></tr></thead>
+                        <tbody>
+                            @forelse ($ranking[$key] as $c)
+                            <tr>
+                                <td style="text-align:left">
+                                    <a href="{{ url('/report?' . $q(['geo_id' => $c->geo_id])) }}" style="color:#fff;text-decoration:none">{{ $c->country_name }}</a>
+                                </td>
+                                <td>{{ $money($c->cost) }}</td>
+                                <td>{{ $money($c->total_rev) }}</td>
+                                <td><span class="{{ $badge }}">{{ $pct($c->troas) }}</span></td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">No country data.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endsection
