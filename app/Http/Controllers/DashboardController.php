@@ -31,6 +31,8 @@ class DashboardController extends Controller
             'activePage' => 'home',
             'pageTitle'  => 'Dashboard',
             'filters'    => $f,
+            'options'    => $this->reports->filterOptions(),
+            'rows'       => $rows,
             'totals'     => $totals,
             'ranking'    => $rank,
             'hasData'    => $rows->isNotEmpty(),

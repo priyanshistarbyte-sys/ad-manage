@@ -43,15 +43,21 @@ class DailyStat extends Model
     }
 
     // ── Derived report metrics ──────────────────────────────────────────
+    /** Ad revenue = Conv. Value straight from the report (conversions_value). */
+    public function getAdRevAttribute(): float
+    {
+        return (float) $this->conversions_value;
+    }
+
     public function getTotalRevAttribute(): float
     {
         return (float) $this->ad_rev + (float) $this->convert_rev + (float) $this->renew_rev;
     }
 
-    /** Target ROAS: total revenue ÷ cost, as a percentage. */
+    /** TROAS (%) = Conv. Value ÷ Cost × 100. */
     public function getTroasAttribute(): float
     {
-        return $this->cost > 0 ? $this->total_rev / $this->cost * 100 : 0;
+        return $this->cost > 0 ? (float) $this->conversions_value / $this->cost * 100 : 0;
     }
 
     /** Cost per install. */

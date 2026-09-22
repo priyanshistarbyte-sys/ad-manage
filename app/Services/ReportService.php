@@ -155,8 +155,11 @@ class ReportService
         foreach (self::SUMS as $c) {
             $r->$c = (float) ($r->$c ?? 0);
         }
+        // Ad revenue = Conv. Value straight from the report (Google Ads conversions_value).
+        $r->ad_rev             = $r->conversions_value;
         $r->total_rev          = $r->ad_rev + $r->convert_rev + $r->renew_rev;
-        $r->troas              = $r->cost > 0 ? $r->total_rev / $r->cost * 100 : 0;
+        // TROAS (%) = Conv. Value ÷ Cost × 100.
+        $r->troas              = $r->cost > 0 ? $r->conversions_value / $r->cost * 100 : 0;
         $r->cpi                = $r->install > 0 ? $r->cost / $r->install : 0;
         $r->trial_convert_perc = $r->trial > 0 ? $r->trial_convert / $r->trial * 100 : 0;
         return $r;

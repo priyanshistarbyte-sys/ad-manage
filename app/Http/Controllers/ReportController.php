@@ -15,21 +15,11 @@ class ReportController extends Controller
     {
     }
 
-    /** Excel-style report: daily rows + TOTAL + country TROAS ranking. */
+    /** The report now lives on the Dashboard — keep this URL working by redirecting
+     *  there with the same filters. */
     public function index(Request $request)
     {
-        $f = $this->reports->filters($request);
-
-        return view('report.index', [
-            'activePage' => 'report',
-            'pageTitle'  => 'Report',
-            'filters'    => $f,
-            'options'    => $this->reports->filterOptions(),
-            'rows'       => $this->reports->dailyRows($f),
-            'totals'     => $this->reports->totals($f),
-            'ranking'    => $this->reports->countryRanking($f),
-            'lastSynced' => DailyStat::max('synced_at'),
-        ]);
+        return redirect('/' . ($request->getQueryString() ? '?' . $request->getQueryString() : ''));
     }
 
     /** Per-country breakdown honouring the same filters (+ optional single date). */
