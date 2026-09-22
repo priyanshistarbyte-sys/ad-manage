@@ -238,11 +238,6 @@ class GoogleAdsService
             $dbg['daily'] = ($summary['daily'] ?? 0) - $dailyBefore;
 
             foreach ($campaigns as $c) {
-                // Skip campaigns that don't promote a tracked App (matched by App ID).
-                if ($this->resolveAppId($c['id']) === null) {
-                    continue;
-                }
-
                 CampaignStat::updateOrCreate(
                     ['connection_id' => $conn->id, 'customer_id' => $customerId, 'campaign_id' => $c['id']],
                     [
@@ -371,14 +366,11 @@ class GoogleAdsService
         $history = [];
 
         foreach ($rows as $row) {
-            $appId = $this->resolveAppId($row['campaign_id']);
-
-            // Only store data for campaigns that belong to a tracked App (matched
-            // by App ID). Everything else from the account is ignored.
-            if ($appId === null) {
-                continue;
-            }
-
+            // Store everything the account returns; app_id is set when the campaign's
+            // App ID matches a tracked App, and left null otherwise. The report only
+            // *displays* tracked apps (app_id not null), so untracked data is kept but
+            // hidden until a matching App is added.
+            $appId    = $this->resolveAppId($row['campaign_id']);
             $totalRev = $row['ad_rev'] + $row['convert_rev'] + $row['renew_rev'];
 
             $daily[] = [

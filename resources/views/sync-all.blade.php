@@ -48,66 +48,6 @@
     </div>
     @endif
 
-    {{-- Debug panel: full per-account sync response (Step: debugging Sync All) --}}
-    @if (session('sync_debug'))
-    @php $dbg = session('sync_debug'); @endphp
-    <div class="data-card" style="margin-bottom:18px;border-color:#a78bfa55">
-        <div class="data-card-header">
-            <span><i class="bi bi-bug"></i> Sync Debug — last run</span>
-            <span style="color:var(--text-muted);font-size:12px">
-                {{ $dbg['range'] }} · {{ $dbg['accounts'] }} account(s) · {{ $dbg['campaigns'] }} campaign(s) · {{ $dbg['daily'] }} daily row(s)
-            </span>
-        </div>
-
-        {{-- Discovery: what the credentials could reach --}}
-        @foreach ($dbg['discovery'] as $d)
-        <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted)">
-            <strong style="color:#fff">{{ $d['connection'] }}</strong> —
-            directly accessible: <span style="color:#a78bfa">{{ count($d['accessible']) }}</span>
-            ({{ implode(', ', $d['accessible']) ?: '—' }}) ·
-            managers found: <span style="color:#a78bfa">{{ count($d['found_managers']) }}</span>
-            ({{ implode(', ', $d['found_managers']) ?: '—' }}) ·
-            total targets queried: <span style="color:#fff">{{ $d['target_count'] }}</span>
-        </div>
-        @endforeach
-
-        {{-- Per-account outcome --}}
-        <div class="table-wrap">
-            <table class="ledger" style="width:100%;white-space:nowrap;font-size:12px">
-                <thead>
-                    <tr><th>Customer ID</th><th>Login used</th><th>Name</th><th>Campaigns</th><th>Daily rows</th><th>Status</th><th>Error</th></tr>
-                </thead>
-                <tbody>
-                    @forelse ($dbg['accounts_detail'] as $a)
-                    <tr>
-                        <td style="text-align:left;font-family:monospace">{{ $a['customer_id'] }}</td>
-                        <td style="text-align:left;font-family:monospace">{{ $a['login'] }}</td>
-                        <td style="text-align:left">{{ $a['name'] ?: '—' }}</td>
-                        <td>{{ $a['campaigns'] }}</td>
-                        <td>{{ $a['daily'] }}</td>
-                        <td>
-                            <span class="{{ $a['status'] === 'ok' ? 'badge-profit' : 'badge-loss' }}">{{ $a['status'] }}</span>
-                        </td>
-                        <td style="text-align:left;color:var(--red);white-space:normal;max-width:420px">{{ $a['error'] }}</td>
-                    </tr>
-                    @empty
-                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">No accounts were queried.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        @if (!empty($dbg['errors']))
-        <div style="padding:12px 16px;border-top:1px solid var(--border)">
-            <div style="color:var(--red);font-size:12px;font-weight:600;margin-bottom:6px">All errors ({{ count($dbg['errors']) }}):</div>
-            <ul style="margin:0;padding-left:18px;color:var(--text-muted);font-size:11.5px">
-                @foreach ($dbg['errors'] as $e)<li style="white-space:normal">{{ $e }}</li>@endforeach
-            </ul>
-        </div>
-        @endif
-    </div>
-    @endif
-
     {{-- Results grouped by account --}}
     @forelse ($grouped as $accountLabel => $rows)
     <div class="data-card" style="margin-bottom:18px">

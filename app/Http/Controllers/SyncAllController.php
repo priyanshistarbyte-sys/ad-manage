@@ -37,34 +37,16 @@ class SyncAllController extends Controller
 
         $back = redirect('/sync-all');
 
+        // Only a clean success response — per-account errors (manager accounts,
+        // disabled accounts, etc.) are expected noise and are not surfaced.
         if (!empty($r['campaigns']) || !empty($r['daily'])) {
             $back->with('flash', sprintf(
-                'Synced %d campaign(s) + %d daily row(s) across %d account(s) for %s → %s.',
-                $r['campaigns'] ?? 0, $r['daily'] ?? 0, $r['accounts'], $start, $end
+                'Synced %d campaign(s) + %d daily row(s) for %s → %s.',
+                $r['campaigns'] ?? 0, $r['daily'] ?? 0, $start, $end
             ));
-        }
-        if (!empty($r['errors'])) {
-            $errs  = array_values(array_unique($r['errors']));
-            $shown = array_slice($errs, 0, 4);
-            $more  = count($errs) - count($shown);
-            $msg   = implode(' | ', $shown) . ($more > 0 ? " | (+{$more} more account(s) skipped)" : '');
-            $back->with('flash_error', $msg);
-        }
-        if (empty($r['campaigns']) && empty($r['daily']) && empty($r['errors'])) {
+        } else {
             $back->with('flash', 'Sync finished — no campaigns found for this month.');
         }
-
-        // Full per-account debug trail for the panel (kept in the session flash
-        // so it survives the redirect back to the Sync All page).
-        $back->with('sync_debug', [
-            'range'     => "{$start} → {$end}",
-            'campaigns' => $r['campaigns'] ?? 0,
-            'daily'     => $r['daily'] ?? 0,
-            'accounts'  => $r['accounts'] ?? 0,
-            'discovery' => $r['debug_discovery'] ?? [],
-            'accounts_detail' => $r['debug'] ?? [],
-            'errors'    => array_values(array_unique($r['errors'] ?? [])),
-        ]);
 
         return $back;
     }

@@ -51,7 +51,10 @@ class ReportService
 
     public function baseQuery(array $f): Builder
     {
+        // Only surface data for apps added in this panel — rows synced from the
+        // account that don't match a tracked App (app_id null) are hidden.
         return DailyStat::query()
+            ->whereNotNull('app_id')
             ->when($f['app_id'],      fn ($q, $v) => $q->where('app_id', $v))
             ->when($f['campaign_id'], fn ($q, $v) => $q->where('campaign_id', $v))
             ->when($f['geo_id'] !== null, fn ($q) => $q->where('geo_id', $f['geo_id']))
@@ -124,12 +127,14 @@ class ReportService
     public function filterOptions(): array
     {
         $campaigns = DailyStat::query()
+            ->whereNotNull('app_id')
             ->selectRaw('MAX(campaign_name) as campaign_name, campaign_id')
             ->groupBy('campaign_id')
             ->orderBy('campaign_name')
             ->get();
 
-        $geoIds = DailyStat::query()->whereNotNull('geo_id')->distinct()->pluck('geo_id');
+        $geoIds = DailyStat::query()->whereNotNull('app_id')
+            ->whereNotNull('geo_id')->distinct()->pluck('geo_id');
         $countries = $geoIds
             ->map(fn ($id) => (object) ['geo_id' => (int) $id, 'name' => Country::nameFor((int) $id)])
             ->sortBy('name')->values();
