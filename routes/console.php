@@ -10,7 +10,8 @@ Artisan::command('inspire', function () {
 
 // ── Auto Daily Sync (Step 14) ───────────────────────────────────────
 // Requires the system cron entry:  * * * * * php /path/artisan schedule:run
-Schedule::command('ads:sync --days=7')
-    ->dailyAt('05:00')
+// Runs at 01:00 every day and syncs the previous calendar day's data.
+Schedule::command('ads:sync --yesterday')
+    ->dailyAt('01:00')
     ->withoutOverlapping()
     ->runInBackground();

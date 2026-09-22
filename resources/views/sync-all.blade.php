@@ -48,14 +48,18 @@
     </div>
     @endif
 
-    {{-- Results grouped by account --}}
+    {{-- Results grouped by account — collapsible; first group open, rest collapsed --}}
     @forelse ($grouped as $accountLabel => $rows)
-    <div class="data-card" style="margin-bottom:18px">
-        <div class="data-card-header">
-            <span><i class="bi bi-building"></i> {{ $accountLabel }}</span>
+    @php $open = $loop->first; @endphp
+    <div class="data-card sync-group" style="margin-bottom:18px">
+        <div class="data-card-header sync-group-toggle" style="cursor:pointer;user-select:none">
+            <span>
+                <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
+                <i class="bi bi-building"></i> {{ $accountLabel }}
+            </span>
             <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} campaign(s)</span>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap sync-group-body" style="{{ $open ? '' : 'display:none' }}">
             <table class="ledger" style="width:100%;white-space:nowrap">
                 <thead>
                     <tr>
@@ -91,4 +95,22 @@
     </div>
     @endforelse
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Collapse / expand each account group. First group starts open (−), the rest
+    // collapsed (+); clicking a header toggles that group.
+    document.querySelectorAll('.sync-group-toggle').forEach(function (header) {
+        header.addEventListener('click', function () {
+            var card = header.closest('.sync-group');
+            var body = card.querySelector('.sync-group-body');
+            var icon = header.querySelector('.toggle-icon');
+            var willOpen = body.style.display === 'none';
+            body.style.display = willOpen ? '' : 'none';
+            icon.classList.toggle('bi-dash-square', willOpen);
+            icon.classList.toggle('bi-plus-square', !willOpen);
+        });
+    });
+</script>
 @endsection

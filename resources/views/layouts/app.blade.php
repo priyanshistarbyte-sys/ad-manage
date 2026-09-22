@@ -8,6 +8,9 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('assets/favicon.svg') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    {{-- Page-specific CDN styles (e.g. daterangepicker) load first… --}}
+    @yield('head')
+    {{-- …so our theme (style.css) loads last and always wins the cascade. --}}
     <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}">
 </head>
 <body>
@@ -17,22 +20,39 @@
         <a class="navbar-brand fw-bold" href="{{ url('/') }}">
             <i class="bi bi-graph-up-arrow me-2"></i>ad-manage
         </a>
-        <div class="nav-links d-none d-md-flex align-items-center gap-1 ms-3 me-auto">
-            <a href="{{ url('/') }}"           class="nav-btn {{ $active==='home'        ? 'active':'' }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a href="{{ url('/apps') }}"       class="nav-btn {{ $active==='apps'        ? 'active':'' }}"><i class="bi bi-grid-3x3-gap"></i> Apps</a>
-            <a href="{{ url('/connections') }}" class="nav-btn {{ $active==='connections' ? 'active':'' }}"><i class="bi bi-google"></i> Ad Accounts</a>
-            <a href="{{ url('/sync-all') }}"   class="nav-btn {{ $active==='sync-all'    ? 'active':'' }}"><i class="bi bi-arrow-repeat"></i> Sync All</a>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            @if (currentUserName() !== '')
-            <span style="color:var(--text-muted);font-size:12px">
-                <i class="bi bi-person-circle"></i>
-                {{ currentUserName() }}@if (isAdmin()) <span style="color:#a78bfa">(admin)</span>@endif
-            </span>
-            @endif
-            <a href="{{ url('/logout') }}" class="btn-primary-custom" style="text-decoration:none">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
+
+        {{-- Hamburger — shown only below md (CSS) --}}
+        <button class="nav-toggle" type="button" data-bs-toggle="offcanvas"
+                data-bs-target="#navMenu" aria-controls="navMenu" aria-label="Open menu">
+            <i class="bi bi-list"></i>
+        </button>
+
+        {{-- Inline on desktop, slide-in sidebar on mobile (Bootstrap offcanvas-md) --}}
+        <div class="nav-collapse offcanvas-md offcanvas-end" tabindex="-1" id="navMenu" aria-labelledby="navMenuLabel">
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title" id="navMenuLabel"><i class="bi bi-graph-up-arrow me-2"></i>ad-manage</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                        data-bs-target="#navMenu" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+                <div class="nav-links">
+                    <a href="{{ url('/') }}"            class="nav-btn {{ $active==='home'        ? 'active':'' }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                    <a href="{{ url('/apps') }}"        class="nav-btn {{ $active==='apps'        ? 'active':'' }}"><i class="bi bi-grid-3x3-gap"></i> Apps</a>
+                    <a href="{{ url('/connections') }}" class="nav-btn {{ $active==='connections' ? 'active':'' }}"><i class="bi bi-google"></i> Ad Accounts</a>
+                    <a href="{{ url('/sync-all') }}"    class="nav-btn {{ $active==='sync-all'    ? 'active':'' }}"><i class="bi bi-arrow-repeat"></i> Sync All</a>
+                    <a href="{{ url('/settings') }}"    class="nav-btn {{ $active==='settings'    ? 'active':'' }}"><i class="bi bi-gear"></i> Settings</a>
+                </div>
+                <div class="nav-user">
+                    @if (currentUserName() !== '')
+                    <span class="nav-btn nav-user-badge">
+                        <i class="bi bi-person-circle"></i> {{ currentUserName() }}@if (isAdmin())<span class="admin-tag">admin</span>@endif
+                    </span>
+                    @endif
+                    <a href="{{ url('/logout') }}" class="btn-primary-custom" style="text-decoration:none">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </nav>
@@ -53,6 +73,7 @@
     @yield('content')
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ asset('assets/js/app.js') }}"></script>
 @yield('scripts')
 </body>

@@ -445,6 +445,13 @@ input[type="date"]::-webkit-calendar-picker-indicator  {
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
     .dash-header { flex-direction: column; align-items: flex-start; }
     .date-picker-wrap { margin-left: 0; }
+    /* Dashboard charts (inline 2fr 1fr) stack to one column */
+    .dash-grid { grid-template-columns: 1fr !important; }
+    /* Give page content more room on phones */
+    main.container-fluid { padding: 14px 12px !important; }
+}
+@media (max-width: 400px) {
+    .kpi-row { grid-template-columns: 1fr; }
 }
 
 /* Mapped chip */
@@ -620,6 +627,67 @@ table.ledger thead th.sort-desc .sort-btn::after { font-size: 11px; }
     background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px;
 }
 .btn-eye-inline:hover { color: #a78bfa; }
+
+/* ── Date-range picker (daterangepicker) — shared across pages ── */
+.entry-range-filter { position: relative; display: block; }
+.entry-range-filter .form-control {
+    width: 100%; padding-left: 32px; cursor: pointer;
+    background: var(--card-bg); border: 1px solid var(--border); color: #fff;
+}
+.entry-range-filter .form-control[readonly] { background: var(--card-bg); color: #fff; }
+.entry-range-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: var(--text-muted); pointer-events: none; }
+
+.daterangepicker {
+    background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; box-shadow: 0 12px 34px rgba(0,0,0,.55); border-radius: 8px;
+}
+.daterangepicker:before { border-bottom-color: var(--border); }
+.daterangepicker:after  { border-bottom-color: var(--card-bg); }
+.daterangepicker.drop-up:before { border-top-color: var(--border); }
+.daterangepicker.drop-up:after  { border-top-color: var(--card-bg); }
+.daterangepicker .calendar-table { background: var(--card-bg); border-color: var(--card-bg); }
+.daterangepicker.show-ranges.ltr .drp-calendar.left { border-left: 1px solid var(--border); }
+.daterangepicker .calendar-table th,
+.daterangepicker .calendar-table td { color: var(--text); border-radius: 6px; }
+.daterangepicker .calendar-table th.month { color: #fff; font-weight: 600; }
+.daterangepicker .calendar-table .next span,
+.daterangepicker .calendar-table .prev span { border-color: var(--text-muted); }
+.daterangepicker td.available:hover,
+.daterangepicker th.available:hover { background: #1a1a42; color: #fff; }
+.daterangepicker td.off,
+.daterangepicker td.off.in-range,
+.daterangepicker td.off.start-date,
+.daterangepicker td.off.end-date { background: transparent; color: #55557a; }
+.daterangepicker td.disabled, .daterangepicker option.disabled { color: #55557a; opacity: .5; }
+.daterangepicker td.in-range { background: #23234d; color: #fff; border-radius: 0; }
+.daterangepicker td.active, .daterangepicker td.active:hover { background: var(--purple); color: #fff; }
+.daterangepicker td.start-date { border-radius: 6px 0 0 6px; }
+.daterangepicker td.end-date { border-radius: 0 6px 6px 0; }
+.daterangepicker td.start-date.end-date { border-radius: 6px; }
+.daterangepicker .ranges li { color: var(--text); border-radius: 6px; margin: 2px 6px; }
+.daterangepicker .ranges li:hover { background: #1a1a42; color: #fff; }
+.daterangepicker .ranges li.active { background: var(--purple); color: #fff; }
+.daterangepicker select.monthselect, .daterangepicker select.yearselect {
+    background: var(--card-bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 2px;
+}
+.daterangepicker .drp-buttons { border-top: 1px solid var(--border); }
+.daterangepicker .drp-selected { color: var(--text-muted); }
+.daterangepicker .drp-buttons .btn { font-size: 12px; padding: 4px 12px; }
+.daterangepicker .drp-buttons .cancelBtn {
+    background: transparent; color: var(--text); border: 1px solid var(--border);
+}
+.daterangepicker .drp-buttons .applyBtn { background: var(--purple); border-color: var(--purple); color: #fff; }
+
+/* ── Dark-themed Bootstrap modal ── */
+.modal-content {
+    background: var(--card-bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 12px;
+}
+.modal-header, .modal-footer { border-color: var(--border); }
+.modal-title { color: #fff; font-size: 15px; font-weight: 600; }
+.modal-backdrop.show { opacity: .65; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

@@ -73,6 +73,24 @@ class ConnectionsController extends Controller
         );
     }
 
+    /** Sync just this one ad account (its accessible client accounts) for the selected range. */
+    public function sync(Request $request, Connection $connection, \App\Services\GoogleAdsService $ads)
+    {
+        [$start, $end] = $this->syncDateRange($request);
+
+        $r = $ads->syncOne($connection, $start, $end);
+
+        if (!empty($r['campaigns']) || !empty($r['daily'])) {
+            return redirect('/connections')->with('flash', sprintf(
+                'Data synced successfully for “%s” — %d campaign(s) + %d daily row(s) for %s → %s.',
+                $connection->name, $r['campaigns'], $r['daily'], $start, $end
+            ));
+        }
+
+        return redirect('/connections')->with('flash',
+            "Sync finished for “{$connection->name}” — no matching app data found for {$start} → {$end}.");
+    }
+
     private function validated(Request $request): array
     {
         $data = $request->validate([

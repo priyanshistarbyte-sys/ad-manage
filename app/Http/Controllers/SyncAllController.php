@@ -7,6 +7,7 @@ use App\Models\CampaignStat;
 use App\Models\Connection;
 use App\Services\GoogleAdsService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class SyncAllController extends Controller
 {
@@ -28,14 +29,14 @@ class SyncAllController extends Controller
         ]);
     }
 
-    public function run(GoogleAdsService $ads)
+    public function run(Request $request, GoogleAdsService $ads)
     {
-        $start = Carbon::now()->startOfMonth()->toDateString();
-        $end   = Carbon::now()->toDateString();
+        [$start, $end] = $this->syncDateRange($request);
 
         $r = $ads->syncAll($start, $end);
 
-        $back = redirect('/sync-all');
+        // Return to whichever page triggered the sync (Sync All or Ad Accounts).
+        $back = redirect()->back(302, [], url('/sync-all'));
 
         // Only a clean success response — per-account errors (manager accounts,
         // disabled accounts, etc.) are expected noise and are not surfaced.
@@ -45,7 +46,7 @@ class SyncAllController extends Controller
                 $r['campaigns'] ?? 0, $r['daily'] ?? 0, $start, $end
             ));
         } else {
-            $back->with('flash', 'Sync finished — no campaigns found for this month.');
+            $back->with('flash', "Sync finished — no campaigns found for {$start} → {$end}.");
         }
 
         return $back;

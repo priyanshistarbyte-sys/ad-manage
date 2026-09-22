@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConnectionsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SyncAllController;
 use Illuminate\Support\Facades\Route;
@@ -35,10 +36,15 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/sync-all', [SyncAllController::class, 'index'])->name('sync-all');
     Route::post('/sync-all', [SyncAllController::class, 'run'])->name('sync-all.run');
 
+    // Settings — app-wide preferences (history view window, …)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+
     // Ad Accounts — Google Ads Manager connections (per-MCC credentials)
     Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');
     Route::post('/connections', [ConnectionsController::class, 'store'])->name('connections.store');
     Route::post('/connections/{connection}/test', [ConnectionsController::class, 'test'])->name('connections.test');
+    Route::post('/connections/{connection}/sync', [ConnectionsController::class, 'sync'])->name('connections.sync');
     Route::get('/connections/{connection}/edit', [ConnectionsController::class, 'edit'])->name('connections.edit');
     Route::put('/connections/{connection}', [ConnectionsController::class, 'update'])->name('connections.update');
     Route::delete('/connections/{connection}', [ConnectionsController::class, 'destroy'])->name('connections.destroy');
