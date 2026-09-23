@@ -236,13 +236,30 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
         @foreach (['profit' => ['Top Profit Countries (TROAS)', 'bi-graph-up-arrow', 'badge-profit'], 'loss' => ['Top Loss Countries (TROAS)', 'bi-graph-down-arrow', 'badge-loss']] as $key => [$title, $icon, $badge])
         <div class="data-card">
-            <div class="data-card-header"><span><i class="bi {{ $icon }}"></i> {{ $title }}</span></div>
+            <div class="data-card-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span><i class="bi {{ $icon }}"></i> {{ $title }}</span>
+                @if ($key === 'profit')
+                <select class="rank-sort" style="background:#1a1a42;border:1px solid var(--border);color:var(--text-muted);
+                        border-radius:6px;padding:3px 8px;font-size:11.5px;cursor:pointer">
+                    <option value="troas:desc">High to Low TROAS</option>
+                    <option value="cost:desc">High to Low Cost</option>
+                    <option value="total_rev:desc">High to Low Total Rev</option>
+                </select>
+                @else
+                <select class="rank-sort" style="background:#1a1a42;border:1px solid var(--border);color:var(--text-muted);
+                        border-radius:6px;padding:3px 8px;font-size:11.5px;cursor:pointer">
+                    <option value="troas:asc">Low to High TROAS</option>
+                    <option value="cost:desc">High to Low Cost</option>
+                    <option value="total_rev:desc">High to Low Total Rev</option>
+                </select>
+                @endif
+            </div>
             <div class="table-wrap">
                 <table class="ledger" style="width:100%">
                     <thead><tr><th>Country</th><th>Cost</th><th>Total Rev</th><th>TROAS</th></tr></thead>
                     <tbody>
                         @forelse ($ranking[$key] as $c)
-                        <tr>
+                        <tr data-cost="{{ (float) $c->cost }}" data-total_rev="{{ (float) $c->total_rev }}" data-troas="{{ (float) $c->troas }}">
                             <td style="text-align:left">
                                 <a href="{{ url('/?' . $q(['geo_id' => $c->geo_id])) }}" style="color:#fff;text-decoration:none">{{ $c->country_name }}</a>
                             </td>
@@ -320,6 +337,23 @@
         $box.on('apply.daterangepicker', function (e, p) {
             apply(p.startDate, p.endDate);
             $box.closest('form').trigger('submit');
+        });
+
+        // Country ranking: re-sort the rows by the chosen metric + direction
+        // (value is "key:asc" or "key:desc").
+        $('.rank-sort').on('change', function () {
+            var parts = String($(this).val()).split(':');
+            var key   = parts[0];
+            var asc   = parts[1] === 'asc';
+            var $body = $(this).closest('.data-card').find('tbody');
+            var $rows = $body.find('tr').filter(function () {
+                return $(this).data(key) !== undefined;
+            });
+            if (!$rows.length) return;
+            $rows.sort(function (a, b) {
+                var diff = parseFloat($(a).data(key)) - parseFloat($(b).data(key));
+                return asc ? diff : -diff;
+            }).appendTo($body);
         });
 
         // Drill-in modal — load the History / Country partial in place instead of
