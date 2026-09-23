@@ -10,8 +10,9 @@ Artisan::command('inspire', function () {
 
 // ── Auto Daily Sync (Step 14) ───────────────────────────────────────
 // Requires the system cron entry:  * * * * * php /path/artisan schedule:run
-// Runs at 01:00 every day and syncs the previous calendar day's data.
-Schedule::command('ads:sync --yesterday')
+// Runs at 01:00 every day. --scheduled re-syncs the last N days (ending
+// yesterday), where N is the `sync_days` setting on the Settings page.
+Schedule::command('ads:sync --scheduled')
     ->dailyAt('01:00')
     ->withoutOverlapping()
     ->runInBackground();

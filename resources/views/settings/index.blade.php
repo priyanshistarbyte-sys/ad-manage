@@ -8,10 +8,10 @@
             <i class="bi bi-clock-history" style="color:var(--purple)"></i> History View Window
         </h5>
         <p style="color:var(--text-muted);font-size:12px;margin:0 0 16px">
-            How many days of snapshots the <strong>View History</strong> page shows for a date — i.e. the selected
-            date's value as it stood over the last N days. <strong>No data is ever deleted</strong>: every snapshot
-            is always kept in the database. This only limits how far back the History page looks, which also keeps
-            that page fast as the table grows.
+            How many days of snapshots the <strong>View History</strong> page shows for a date, and how many
+            trailing days the <strong>daily 01:00 auto-sync</strong> re-pulls from Google Ads (ending yesterday).
+            <strong>No data is ever deleted</strong> — every snapshot is always kept; this only bounds the History
+            page's view window and the cron's sync window.
         </p>
 
         <form method="post" action="{{ url('/settings') }}">
@@ -24,7 +24,8 @@
                            required min="0" max="3650"
                            value="{{ old('history_visible_days', $historyDays) }}">
                     <div style="color:var(--text-muted);font-size:11.5px;margin-top:6px">
-                        Default 90. Use <strong>0</strong> to show the full history (all saved snapshots).
+                        Default 90. Use <strong>0</strong> to show the full history on the History page
+                        (the auto-sync then falls back to 90 days).
                     </div>
                 </div>
             </div>
