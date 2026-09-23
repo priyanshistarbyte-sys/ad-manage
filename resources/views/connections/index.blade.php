@@ -60,7 +60,7 @@
                         <th>Manager ID</th>
                         <th>Apps</th>
                         <th>Status</th>
-                        <th></th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -55,6 +55,15 @@
         background: transparent; color: var(--text); border: 1px solid var(--border);
     }
     .daterangepicker .drp-buttons .applyBtn { background: var(--purple); border-color: var(--purple); color: #fff; }
+
+    /* Chart card heading — clean title + divider, no heavy filled bar */
+    .chart-head {
+        display: flex; align-items: center; gap: 8px;
+        font-weight: 700; font-size: 14px; color: #fff;
+        padding: 2px 0 12px; margin-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    .chart-head i { color: var(--purple); font-size: 15px; }
 </style>
 @endsection
 
@@ -106,7 +115,7 @@
                     @endforeach
                 </select>
             </div>
-            <div style="grid-column:span 2">
+            <div style="grid-column:span 1">
                 <label class="form-label">Date range</label>
                 <div class="entry-range-filter">
                     <i class="bi bi-calendar-range entry-range-icon"></i>
@@ -116,24 +125,17 @@
                 <input type="hidden" name="from" id="fromInput" value="{{ $filters['from'] }}">
                 <input type="hidden" name="to"   id="toInput"   value="{{ $filters['to'] }}">
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
                 <button class="btn-primary-custom" type="submit"><i class="bi bi-funnel"></i> Apply</button>
-                <a href="{{ url('/') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted);align-self:center">Reset</a>
-            </div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:12px">
-            <div style="color:var(--text-muted);font-size:12px">
-                {{ \Carbon\Carbon::parse($filters['from'])->format('d M Y') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
-                @if ($lastSynced) · synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }} @endif
-            </div>
-            <div class="d-flex gap-2">
+                <a href="{{ url('/') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted)">Reset</a>
                 <a href="{{ url('/report/export?' . $q()) }}" class="btn-sm-custom" style="background:#1a7f37;color:#fff;text-decoration:none">
                     <i class="bi bi-filetype-csv"></i> Export CSV
                 </a>
-                <a href="{{ url('/sync-all') }}" class="btn-sm-custom" style="text-decoration:none">
-                    <i class="bi bi-arrow-repeat"></i> Sync
-                </a>
             </div>
+        </div>
+        <div style="margin-top:12px;color:var(--text-muted);font-size:12px">
+            {{ \Carbon\Carbon::parse($filters['from'])->format('d M Y') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
+            @if ($lastSynced) · synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }} @endif
         </div>
     </form>
 
@@ -157,11 +159,11 @@
     {{-- Charts: Cost vs Revenue + TROAS Trend (honour the filters above) --}}
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px" class="dash-grid">
         <div class="data-card" style="padding:16px">
-            <div class="data-card-header" style="border:0;padding:0 0 10px"><span><i class="bi bi-graph-up"></i> Cost vs Revenue</span></div>
+            <div class="chart-head"><i class="bi bi-graph-up"></i> Cost vs Revenue</div>
             <canvas id="costRevChart" height="120"></canvas>
         </div>
         <div class="data-card" style="padding:16px">
-            <div class="data-card-header" style="border:0;padding:0 0 10px"><span><i class="bi bi-activity"></i> TROAS Trend</span></div>
+            <div class="chart-head"><i class="bi bi-activity"></i> TROAS Trend</div>
             <canvas id="troasChart" height="120"></canvas>
         </div>
     </div>
@@ -381,8 +383,15 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
     const gridColor = 'rgba(255,255,255,.06)', tick = '#9aa0b5';
-    const base = { responsive:true, plugins:{legend:{labels:{color:tick}}},
-        scales:{x:{ticks:{color:tick},grid:{color:gridColor}},y:{ticks:{color:tick},grid:{color:gridColor}}} };
+    const base = {
+        responsive:true,
+        plugins:{ legend:{
+            position:'top', align:'end',
+            labels:{ color:tick, usePointStyle:true, pointStyle:'circle',
+                     boxWidth:8, boxHeight:8, padding:16, font:{ size:11 } }
+        }},
+        scales:{x:{ticks:{color:tick},grid:{color:gridColor}},y:{ticks:{color:tick},grid:{color:gridColor}}}
+    };
 
     new Chart(document.getElementById('costRevChart'), {
         type:'line',

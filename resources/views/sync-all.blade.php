@@ -34,9 +34,9 @@
     <div style="background:rgba(167,139,250,.06);border:1px solid #a78bfa33;border-radius:10px;
                 padding:12px 18px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px">
         <i class="bi bi-info-circle" style="color:#a78bfa"></i>
-        Synced campaigns are matched to your apps automatically by <strong style="color:#fff">App ID</strong>
-        (the campaign's target Play package). Add apps on the
-        <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page — no customer or campaign IDs needed.
+        Synced campaigns are matched to your apps automatically by <strong style="color:#fff">App ID</strong>.
+        Add an app with just its <strong style="color:#fff">App name</strong> and <strong style="color:#fff">App ID</strong>
+        on the <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page.
     </div>
 
     @if ($connections->isEmpty())

@@ -69,7 +69,7 @@
                         <th>App</th>
                         <th>App ID</th>
                         <th>Data</th>
-                        <th></th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
