@@ -63,12 +63,14 @@ class GoogleAdsService
         try {
             $token    = $this->accessToken($conn);
             $accounts = $this->listAccessibleCustomers($token, $conn->developer_token);
+            $conn->recordSignin(true);
             return [
                 'ok'       => true,
                 'accounts' => count($accounts),
                 'message'  => 'Signed in OK · ' . count($accounts) . ' accessible account(s).',
             ];
         } catch (\Throwable $e) {
+            $conn->recordSignin(false, $e->getMessage());
             return ['ok' => false, 'accounts' => 0, 'message' => $e->getMessage()];
         }
     }
@@ -76,6 +78,7 @@ class GoogleAdsService
     public function syncAll(string $start, string $end): array
     {
         $summary = ['campaigns' => 0, 'accounts' => 0, 'daily' => 0, 'errors' => [],
+                    'probe_campaigns' => 0, 'skipped_untracked' => 0, 'tracked_accounts' => 0,
                     'debug' => [], 'debug_discovery' => []];
 
         // Many accessible accounts = many API calls; don't let PHP time out mid-sync.
@@ -133,7 +136,16 @@ class GoogleAdsService
 
     private function syncConnection(Connection $conn, string $start, string $end, array &$summary): void
     {
-        $token   = $this->accessToken($conn);
+        // Sign in first and record the outcome so the Ad Accounts page can flag an
+        // expired/revoked token with a "Reconnect" badge (see Connection::recordSignin).
+        try {
+            $token = $this->accessToken($conn);
+        } catch (\Throwable $e) {
+            $conn->recordSignin(false, $e->getMessage());
+            throw $e;
+        }
+        $conn->recordSignin(true);
+
         $devToken = $conn->developer_token;
 
         // 1. Accounts the credentials can access.
@@ -269,14 +281,18 @@ class GoogleAdsService
                 continue;
             }
 
-            $appMap = [];
+            $appMap    = [];   // campaign_id => store App ID (app campaigns only)
+            $campaigns = 0;    // total campaigns seen in this account (any type)
             foreach ($rows as $r) {
                 $id    = (string) data_get($r, 'campaign.id');
+                if ($id === '') continue;
+                $campaigns++;
                 $appId = data_get($r, 'campaign.appCampaignSetting.appId');
-                if ($id !== '' && !empty($appId)) {
+                if (!empty($appId)) {
                     $appMap[$id] = $appId;
                 }
             }
+            $summary['probe_campaigns'] += $campaigns;
 
             $tracked = array_values(array_filter(
                 array_keys($appMap),
@@ -286,10 +302,17 @@ class GoogleAdsService
             // No tracked apps here → skip entirely (no campaign_stats, no geo).
             if (empty($tracked)) {
                 $dbg['status'] = 'no-tracked-apps';
+                // Distinguish "account has app campaigns but none match a tracked
+                // App" from "no app campaigns at all" — the former means the App
+                // ID on the Apps page doesn't match the campaign's target package.
+                if (!empty($appMap)) {
+                    $summary['skipped_untracked']++;
+                }
                 $summary['debug'][] = $dbg;
                 continue;
             }
 
+            $summary['tracked_accounts']++;
             $trackedByAccount[$customerId] = ['tracked' => $tracked, 'appMap' => $appMap, 'meta' => $meta, 'dbg' => $dbg];
         }
 

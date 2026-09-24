@@ -15,8 +15,20 @@ class Connection extends Model
     protected $hidden = ['client_secret', 'refresh_token'];
 
     protected $casts = [
-        'active' => 'boolean',
+        'active'         => 'boolean',
+        'last_signin_ok' => 'boolean',
+        'last_signin_at' => 'datetime',
     ];
+
+    /** Record the outcome of the most recent Google sign-in attempt. */
+    public function recordSignin(bool $ok, ?string $error = null): void
+    {
+        $this->forceFill([
+            'last_signin_ok'    => $ok,
+            'last_signin_error' => $ok ? null : \Illuminate\Support\Str::limit((string) $error, 490, ''),
+            'last_signin_at'    => now(),
+        ])->save();
+    }
 
     public function apps(): HasMany
     {

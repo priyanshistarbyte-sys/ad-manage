@@ -88,7 +88,12 @@ class ReportController extends Controller
                 ->map(function ($group) {
                     $sum = fn ($col) => (float) $group->sum($col);
                     $cost = $sum('cost');
-                    $totalRev = $sum('total_rev');
+                    // CONVERT_REV is excluded from the report → 0, and TOTAL_REV is
+                    // recomputed as AD_REV + RENEW_REV (the stored total_rev snapshot
+                    // still includes the old convert_rev).
+                    $adRev    = $sum('ad_rev');
+                    $renewRev = $sum('renew_rev');
+                    $totalRev = $adRev + $renewRev;
                     return (object) [
                         'captured_at' => $group->first()->captured_at,
                         'cost'        => $cost,
@@ -96,9 +101,9 @@ class ReportController extends Controller
                         'troas'       => $cost > 0 ? $totalRev / $cost * 100 : 0,
                         'install'     => $sum('install'),
                         'trial'       => $sum('trial'),
-                        'ad_rev'      => $sum('ad_rev'),
-                        'convert_rev' => $sum('convert_rev'),
-                        'renew_rev'   => $sum('renew_rev'),
+                        'ad_rev'      => $adRev,
+                        'convert_rev' => 0.0,
+                        'renew_rev'   => $renewRev,
                         'rows'        => $group->count(),
                     ];
                 });

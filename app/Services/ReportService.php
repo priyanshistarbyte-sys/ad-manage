@@ -162,7 +162,11 @@ class ReportService
         }
         // Ad revenue = Conv. Value straight from the report (Google Ads conversions_value).
         $r->ad_rev             = $r->conversions_value;
-        $r->total_rev          = $r->ad_rev + $r->convert_rev + $r->renew_rev;
+        // CONVERT_REV is excluded from the report — its conversion-action mapping is
+        // unreliable, so it's forced to 0 and left out of TOTAL_REV. (Raw synced
+        // values stay in the DB, so this is reversible.)
+        $r->convert_rev        = 0.0;
+        $r->total_rev          = $r->ad_rev + $r->renew_rev;
         // TROAS (%) = Conv. Value ÷ Cost × 100.
         $r->troas              = $r->cost > 0 ? $r->conversions_value / $r->cost * 100 : 0;
         $r->cpi                = $r->install > 0 ? $r->cost / $r->install : 0;

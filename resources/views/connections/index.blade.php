@@ -71,7 +71,22 @@
                         <td>{{ $c->apps_count }}</td>
                         <td>
                             @if ($c->isConfigured())
-                                <span class="badge-profit">Configured</span>
+                                @if ($c->last_signin_ok === false)
+                                    <span class="badge-loss" title="{{ $c->last_signin_error }}">
+                                        <i class="bi bi-exclamation-octagon"></i> Reconnect
+                                    </span>
+                                    <div style="color:#f85149;font-size:10px;margin-top:3px;max-width:220px;white-space:normal">
+                                        Sign-in failed{{ $c->last_signin_at ? ' ' . \Carbon\Carbon::parse($c->last_signin_at)->diffForHumans() : '' }} — update the Refresh Token, then Test.
+                                    </div>
+                                @elseif ($c->last_signin_ok === true)
+                                    <span class="badge-profit"><i class="bi bi-check-circle"></i> Connected</span>
+                                    @if ($c->last_signin_at)
+                                    <div style="color:var(--text-muted);font-size:10px;margin-top:3px">checked {{ \Carbon\Carbon::parse($c->last_signin_at)->diffForHumans() }}</div>
+                                    @endif
+                                @else
+                                    <span class="badge-profit">Configured</span>
+                                    <div style="color:var(--text-muted);font-size:10px;margin-top:3px">not tested yet</div>
+                                @endif
                                 @unless (\Illuminate\Support\Str::startsWith((string) $c->client_secret, 'GOCSPX-'))
                                 <div style="color:#fbbf24;font-size:10px;margin-top:3px" title="Google OAuth client secrets start with GOCSPX-">
                                     <i class="bi bi-exclamation-triangle"></i> secret ≠ GOCSPX-…

@@ -49,9 +49,15 @@ class DailyStat extends Model
         return (float) $this->conversions_value;
     }
 
+    /** CONVERT_REV is excluded from the report (unreliable mapping) → always 0. */
+    public function getConvertRevAttribute(): float
+    {
+        return 0.0;
+    }
+
     public function getTotalRevAttribute(): float
     {
-        return (float) $this->ad_rev + (float) $this->convert_rev + (float) $this->renew_rev;
+        return (float) $this->ad_rev + (float) $this->renew_rev;
     }
 
     /** TROAS (%) = Conv. Value ÷ Cost × 100. */
