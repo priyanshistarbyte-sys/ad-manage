@@ -48,19 +48,26 @@
     </div>
     @endif
 
-    {{-- Results grouped by account — collapsible; first group open, rest collapsed --}}
-    @forelse ($grouped as $accountLabel => $rows)
-    @php $open = $loop->first; @endphp
+    {{-- Results grouped by month (newest first) — collapsible; current/first month open, rest collapsed --}}
+    @forelse ($grouped as $month => $rows)
+    @php
+        $open      = $loop->first;
+        $monthDate = \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $isCurrent = $month === now()->format('Y-m');
+    @endphp
     <div class="data-card sync-group" style="margin-bottom:18px">
         <div class="data-card-header sync-group-toggle" style="cursor:pointer;user-select:none">
             <span>
                 <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
-                <i class="bi bi-building"></i> {{ $accountLabel }}
+                <i class="bi bi-calendar3"></i> {{ $monthDate->format('F Y') }}
+                @if ($isCurrent)<span class="badge-nodata" style="margin-left:6px">Current</span>@endif
             </span>
-            <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} campaign(s)</span>
+            <span style="color:var(--text-muted);font-size:12px">
+                {{ $rows->count() }} campaign(s) · Cost {{ $money($rows->sum('cost')) }}
+            </span>
         </div>
         <div class="table-wrap sync-group-body" style="{{ $open ? '' : 'display:none' }}">
-            <table class="ledger" style="width:100%;white-space:nowrap">
+            <table class="ledger sortable" style="width:100%;white-space:nowrap">
                 <thead>
                     <tr>
                         <th>Campaign</th><th>Status</th><th>Type</th>
@@ -71,7 +78,10 @@
                 <tbody>
                     @foreach ($rows as $s)
                     <tr>
-                        <td style="text-align:left;font-weight:600;color:#fff">{{ $s->campaign_name ?: $s->campaign_id }}</td>
+                        <td style="text-align:left" data-sort="{{ $s->campaign_name ?: $s->campaign_id }}">
+                            <div style="font-weight:600;color:#fff">{{ $s->campaign_name ?: $s->campaign_id }}</div>
+                            <div style="color:var(--text-muted);font-size:11px">{{ optional($s->connection)->name }} · {{ $s->account_name ?: $s->customer_id }}</div>
+                        </td>
                         <td><span class="badge-nodata">{{ $s->status ?: '—' }}</span></td>
                         <td>{{ $s->channel_type ?: '—' }}</td>
                         <td>{{ $money($s->cost) }}</td>
@@ -99,7 +109,7 @@
 
 @section('scripts')
 <script>
-    // Collapse / expand each account group. First group starts open (−), the rest
+    // Collapse / expand each month group. Newest month starts open (−), the rest
     // collapsed (+); clicking a header toggles that group.
     document.querySelectorAll('.sync-group-toggle').forEach(function (header) {
         header.addEventListener('click', function () {

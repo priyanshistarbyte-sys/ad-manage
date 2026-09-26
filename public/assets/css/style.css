@@ -694,3 +694,14 @@ table.ledger thead th.sort-desc .sort-btn::after { font-size: 11px; }
 ::-webkit-scrollbar-track { background: var(--header-bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--purple); }
+
+/* ── Click-to-sort headers (table.sortable, handled in app.js) ── */
+table.ledger.sortable thead th:not(:empty) { cursor: pointer; user-select: none; transition: color .15s; }
+table.ledger.sortable thead th:not(:empty):hover { color: #a78bfa; }
+table.ledger.sortable thead th:not(:empty)::after {
+    content: '⇅'; margin-left: 4px; font-size: 10px; opacity: .35;
+}
+table.ledger.sortable thead th.sort-asc,
+table.ledger.sortable thead th.sort-desc { color: #a78bfa; }
+table.ledger.sortable thead th.sort-asc::after  { content: '↑'; opacity: 1; }
+table.ledger.sortable thead th.sort-desc::after { content: '↓'; opacity: 1; }

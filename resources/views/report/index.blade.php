@@ -87,7 +87,7 @@
                 <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} day(s)</span>
             </div>
             <div class="table-wrap">
-                <table class="ledger monthly" style="width:100%;white-space:nowrap">
+                <table class="ledger monthly sortable" style="width:100%;white-space:nowrap">
                     <thead>
                         <tr>
                             <th>DATE</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
@@ -100,7 +100,7 @@
                         @forelse ($rows as $r)
                         @php $d = \Carbon\Carbon::parse($r->date)->format('Y-m-d'); @endphp
                         <tr>
-                            <td>{{ \Carbon\Carbon::parse($r->date)->format('d-m-Y') }}</td>
+                            <td data-sort="{{ $d }}">{{ \Carbon\Carbon::parse($r->date)->format('d-m-Y') }}</td>
                             <td>{{ $money($r->cost) }}</td>
                             <td><span class="{{ $r->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($r->troas) }}</span></td>
                             <td>{{ $money($r->total_rev) }}</td>
@@ -150,7 +150,7 @@
             <div class="data-card">
                 <div class="data-card-header"><span><i class="bi {{ $icon }}"></i> {{ $title }}</span></div>
                 <div class="table-wrap">
-                    <table class="ledger" style="width:100%">
+                    <table class="ledger sortable" style="width:100%">
                         <thead><tr><th>Country</th><th>Cost</th><th>Total Rev</th><th>TROAS</th></tr></thead>
                         <tbody>
                             @forelse ($ranking[$key] as $c)

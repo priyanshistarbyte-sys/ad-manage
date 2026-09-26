@@ -17,7 +17,7 @@
         <span style="color:var(--text-muted);font-size:12px">{{ $snapshots->count() }} day(s)</span>
     </div>
     <div class="table-wrap">
-        <table class="ledger monthly" style="width:100%;white-space:nowrap">
+        <table class="ledger monthly sortable" style="width:100%;white-space:nowrap">
             <thead>
                 <tr>
                     <th>AS OF</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
@@ -29,11 +29,11 @@
             <tbody>
                 @forelse ($snapshots as $when => $s)
                 <tr>
-                    <td>{{ \Carbon\Carbon::parse($when)->format('d M Y') }}</td>
+                    <td data-sort="{{ \Carbon\Carbon::parse($when)->format('Y-m-d') }}">{{ \Carbon\Carbon::parse($when)->format('d M Y') }}</td>
                     <td>{{ $money($s->cost) }}</td>
                     <td><span class="{{ $s->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($s->troas) }}</span></td>
                     <td>{{ $money($s->total_rev) }}</td>
-                    <td>
+                    <td data-sort="{{ $s->delta_rev ?? '' }}">
                         @if ($s->delta_rev === null)
                             <span style="color:var(--text-muted)">—</span>
                         @elseif ($s->delta_rev > 0)

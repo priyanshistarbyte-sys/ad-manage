@@ -8,25 +8,81 @@ use App\Models\Connection;
 use App\Services\GoogleAdsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SyncAllController extends Controller
 {
     public function index()
     {
-        $stats = CampaignStat::with('connection')
-            ->orderByDesc('cost')->get()
-            ->groupBy(fn ($s) => optional($s->connection)->name . ' · ' . ($s->account_name ?: $s->customer_id));
-
         return view('sync-all', [
             'activePage'   => 'sync-all',
             'pageTitle'    => 'Sync All',
-            'grouped'      => $stats,
+            'grouped'      => $this->campaignsByMonth(),
             'connections'  => Connection::where('active', true)->get(),
             'apps'         => App::with('connection')->orderBy('name')->get(),
             'lastSynced'   => CampaignStat::max('synced_at'),
             'periodStart'  => Carbon::now()->startOfMonth()->toDateString(),
             'periodEnd'    => Carbon::now()->toDateString(),
         ]);
+    }
+
+    /**
+     * Campaign totals per calendar month, newest month first ("Y-m" => rows).
+     * Metrics come from daily_stats (summed over days + countries); name /
+     * status / type come from campaign_stats. Campaigns synced this month with
+     * no spend yet (e.g. paused) still appear in the current month with zeros.
+     */
+    private function campaignsByMonth()
+    {
+        $monthExpr = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', date)"
+            : "DATE_FORMAT(date, '%Y-%m')";
+
+        $meta = CampaignStat::with('connection')->get()
+            ->keyBy(fn ($s) => "{$s->connection_id}|{$s->customer_id}|{$s->campaign_id}");
+
+        $rows = DB::table('daily_stats')
+            ->selectRaw("{$monthExpr} as month, connection_id, customer_id, campaign_id,
+                         MAX(campaign_name) as campaign_name, MAX(account_name) as account_name,
+                         SUM(cost) as cost, SUM(conversions) as conversions,
+                         SUM(conversions_value) as conversions_value,
+                         SUM(impressions) as impressions, SUM(clicks) as clicks")
+            ->groupByRaw("{$monthExpr}, connection_id, customer_id, campaign_id")
+            ->get()
+            ->map(function ($r) use ($meta) {
+                $m = $meta->get("{$r->connection_id}|{$r->customer_id}|{$r->campaign_id}");
+                return (new CampaignStat([
+                    'month'             => $r->month,
+                    'connection_id'     => $r->connection_id,
+                    'customer_id'       => $r->customer_id,
+                    'campaign_id'       => $r->campaign_id,
+                    'campaign_name'     => $m->campaign_name ?? $r->campaign_name,
+                    'account_name'      => $m->account_name ?? $r->account_name,
+                    'status'            => $m->status ?? null,
+                    'channel_type'      => $m->channel_type ?? null,
+                    'cost'              => $r->cost,
+                    'conversions'       => $r->conversions,
+                    'conversions_value' => $r->conversions_value,
+                    'impressions'       => $r->impressions,
+                    'clicks'            => $r->clicks,
+                ]))->setRelation('connection', $m->connection ?? Connection::find($r->connection_id));
+            });
+
+        // Zero-fill this month's synced campaigns that have no daily rows yet.
+        $current = Carbon::now()->format('Y-m');
+        $seen    = $rows->where('month', $current)
+            ->map(fn ($r) => "{$r->connection_id}|{$r->customer_id}|{$r->campaign_id}")->flip();
+        foreach ($meta as $key => $m) {
+            if (!$seen->has($key) && $m->period_end && $m->period_end->format('Y-m') === $current) {
+                $zero = $m->replicate()->fill(['cost' => 0, 'conversions' => 0, 'conversions_value' => 0, 'impressions' => 0, 'clicks' => 0]);
+                $zero->month = $current;
+                $rows->push($zero);
+            }
+        }
+
+        return $rows->sortByDesc('cost')
+            ->groupBy('month')
+            ->sortKeysDesc();
     }
 
     public function run(Request $request, GoogleAdsService $ads)

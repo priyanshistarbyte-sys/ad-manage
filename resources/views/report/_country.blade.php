@@ -22,7 +22,7 @@
         <span><i class="bi bi-flag"></i> Performance by Country</span>
     </div>
     <div class="table-wrap">
-        <table class="ledger monthly" style="width:100%;white-space:nowrap">
+        <table class="ledger monthly sortable" style="width:100%;white-space:nowrap">
             <thead>
                 <tr>
                     <th>COUNTRY</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
@@ -33,7 +33,7 @@
             <tbody>
                 @forelse ($countryRows as $c)
                 <tr>
-                    <td>
+                    <td data-sort="{{ $c->country_name }}">
                         <span style="color:var(--text-muted);font-size:11px">{{ $c->country_code }}</span>
                         {{ $c->country_name }}
                     </td>
