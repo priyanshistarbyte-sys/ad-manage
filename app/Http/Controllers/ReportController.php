@@ -51,16 +51,14 @@ class ReportController extends Controller
         $campaignId = $request->query('campaign_id');
         $geoId      = $request->query('geo_id');
 
-        // daily_stat_history has no app_id column, so scope by the app's campaigns
-        // (resolved from daily_stats) — keeps history consistent with the app the
-        // dashboard was filtered to.
-        $appCampaignIds = null;
-        if ($appId !== null && $appId !== '') {
-            $appCampaignIds = DailyStat::where('app_id', $appId)
-                ->distinct()
-                ->pluck('campaign_id')
-                ->all();
-        }
+        // daily_stat_history has no app_id column, so scope by campaigns resolved
+        // from daily_stats — the chosen app's, or every tracked app's (the
+        // dashboard hides untracked rows, so history must too).
+        $appCampaignIds = DailyStat::query()
+            ->when($appId !== null && $appId !== '', fn ($q) => $q->where('app_id', $appId), fn ($q) => $q->whereNotNull('app_id'))
+            ->distinct()
+            ->pluck('campaign_id')
+            ->all();
 
         // How many capture-days of history to show (0 = all). Storage is never
         // touched — this only bounds the query window, which also keeps the page
@@ -74,56 +72,47 @@ class ReportController extends Controller
                 ->where('date', $date) // plain '=' uses the (date, campaign_id, geo_id) index; whereDate() would wrap it in DATE() and skip it
                 ->when($since, fn ($q) => $q->where('captured_at', '>=', $since))
                 ->when($campaignId, fn ($q) => $q->where('campaign_id', $campaignId))
-                ->when($appCampaignIds !== null, fn ($q) => $q->whereIn('campaign_id', $appCampaignIds ?: ['__none__']))
+                ->whereIn('campaign_id', $appCampaignIds ?: ['__none__'])
                 ->when($geoId !== null && $geoId !== '', fn ($q) => $q->where('geo_id', (int) $geoId))
                 ->orderBy('captured_at')
-                ->limit(5000)
+                ->limit(50000)
                 ->get();
 
-            // Each Sync All writes one snapshot (a captured_at) holding many
-            // per-campaign/geo rows for the day. Sum those rows into one total
-            // per sync run, so we compare like-with-like across runs.
-            $perRun = $rows
-                ->groupBy(fn ($h) => (string) $h->captured_at)
-                ->map(function ($group) {
-                    $sum = fn ($col) => (float) $group->sum($col);
+            // One row per capture DAY, so the history reads date-wise: the selected
+            // date's value as it stood on each day since. Every ad account is synced
+            // separately (its own captured_at), so for each day take the latest
+            // snapshot of every account/campaign/geo row and sum those — not just
+            // the day's last run, which would only cover one account.
+            $snapshots = $rows
+                ->groupBy(fn ($h) => Carbon::parse($h->captured_at)->format('Y-m-d'))
+                ->map(function ($dayRows) {
+                    $latest = $dayRows
+                        ->groupBy(fn ($h) => "{$h->connection_id}|{$h->customer_id}|{$h->campaign_id}|{$h->geo_id}")
+                        ->map(fn ($g) => $g->last()); // rows are ordered by captured_at
+                    $sum = fn ($col) => (float) $latest->sum($col);
                     $cost = $sum('cost');
-                    // CONVERT_REV is excluded from the report → 0, and TOTAL_REV is
-                    // recomputed as AD_REV + RENEW_REV (the stored total_rev snapshot
-                    // still includes the old convert_rev).
-                    $adRev    = $sum('ad_rev');
+                    // Same rules as the report: AD_REV = Conv. Value, CONVERT_REV
+                    // excluded (0), TOTAL_REV = AD_REV + RENEW_REV, TROAS = Conv.
+                    // Value ÷ Cost. Snapshots taken before Conv. Value was stored
+                    // have it NULL — revenue is unknown there, so report null (the
+                    // view shows "not recorded") instead of a misleading 0%.
+                    $known    = $latest->every(fn ($h) => $h->conversions_value !== null);
+                    $adRev    = $known ? $sum('conversions_value') : null;
                     $renewRev = $sum('renew_rev');
-                    $totalRev = $adRev + $renewRev;
                     return (object) [
-                        'captured_at' => $group->first()->captured_at,
+                        'captured_at' => $dayRows->last()->captured_at,
                         'cost'        => $cost,
-                        'total_rev'   => $totalRev,
-                        'troas'       => $cost > 0 ? $totalRev / $cost * 100 : 0,
+                        'total_rev'   => $known ? $adRev + $renewRev : null,
+                        'troas'       => $known ? ($cost > 0 ? $adRev / $cost * 100 : 0) : null,
                         'install'     => $sum('install'),
                         'trial'       => $sum('trial'),
                         'ad_rev'      => $adRev,
                         'convert_rev' => 0.0,
                         'renew_rev'   => $renewRev,
-                        'rows'        => $group->count(),
+                        'rows'        => $latest->count(),
                     ];
-                });
-
-            // Collapse to one row per capture DAY — the latest sync of that day —
-            // so the history reads date-wise: the selected date's value as it
-            // stood on each day since (e.g. Sep 2's numbers as seen on 2, 3 … 22).
-            $snapshots = $perRun
-                ->groupBy(fn ($s) => Carbon::parse($s->captured_at)->format('Y-m-d'))
-                ->map(fn ($runs) => $runs->sortByDesc('captured_at')->first())
+                })
                 ->sortKeys();
-
-            // Day-over-day change in total revenue (how much Google restated the
-            // number since the previous capture day). First row has no baseline.
-            $prevRev = null;
-            $snapshots = $snapshots->map(function ($s) use (&$prevRev) {
-                $s->delta_rev = $prevRev === null ? null : $s->total_rev - $prevRev;
-                $prevRev = $s->total_rev;
-                return $s;
-            });
         }
 
         $appName = null;

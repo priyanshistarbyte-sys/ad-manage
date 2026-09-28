@@ -21,7 +21,6 @@
             <thead>
                 <tr>
                     <th>AS OF</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
-                    <th>Δ TOTAL_REV</th>
                     <th>AD_REV</th><th>CONVERT_REV</th><th>RENEW_REV</th>
                     <th>TRIAL</th><th>INSTALL</th><th>ROWS</th>
                 </tr>
@@ -31,20 +30,16 @@
                 <tr>
                     <td data-sort="{{ \Carbon\Carbon::parse($when)->format('Y-m-d') }}">{{ \Carbon\Carbon::parse($when)->format('d M Y') }}</td>
                     <td>{{ $money($s->cost) }}</td>
+                    @if ($s->troas === null)
+                    {{-- Snapshot taken before Conv. Value was stored — revenue unknown. --}}
+                    <td data-sort="-1"><span style="color:var(--text-muted)" title="Revenue wasn't recorded in snapshots before 28 Sep 2026">—</span></td>
+                    <td data-sort="-1"><span style="color:var(--text-muted);font-size:11px" title="Revenue wasn't recorded in snapshots before 28 Sep 2026">not recorded</span></td>
+                    <td data-sort="-1"><span style="color:var(--text-muted);font-size:11px" title="Revenue wasn't recorded in snapshots before 28 Sep 2026">not recorded</span></td>
+                    @else
                     <td><span class="{{ $s->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($s->troas) }}</span></td>
                     <td>{{ $money($s->total_rev) }}</td>
-                    <td data-sort="{{ $s->delta_rev ?? '' }}">
-                        @if ($s->delta_rev === null)
-                            <span style="color:var(--text-muted)">—</span>
-                        @elseif ($s->delta_rev > 0)
-                            <span style="color:#3fb950">▲ {{ $money($s->delta_rev) }}</span>
-                        @elseif ($s->delta_rev < 0)
-                            <span style="color:#f85149">▼ {{ $money(abs($s->delta_rev)) }}</span>
-                        @else
-                            <span style="color:var(--text-muted)">0.00</span>
-                        @endif
-                    </td>
                     <td>{{ $money($s->ad_rev) }}</td>
+                    @endif
                     <td>{{ $money($s->convert_rev) }}</td>
                     <td>{{ $money($s->renew_rev) }}</td>
                     <td>{{ $num($s->trial) }}</td>
@@ -52,7 +47,7 @@
                     <td>{{ $num($s->rows) }}</td>
                 </tr>
                 @empty
-                <tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:32px">
+                <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:32px">
                     No history yet for this day. Snapshots are written on every Sync All.
                 </td></tr>
                 @endforelse
@@ -60,3 +55,8 @@
         </table>
     </div>
 </div>
+@if ($snapshots->contains(fn ($s) => $s->troas === null))
+<div style="color:var(--text-muted);font-size:11.5px;margin-top:10px">
+    <i class="bi bi-info-circle"></i> Snapshots before 28 Sep 2026 saved cost and installs but not Conv. Value, so their TROAS / revenue can't be shown. Every sync from now on records it.
+</div>
+@endif

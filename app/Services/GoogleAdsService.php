@@ -537,6 +537,7 @@ class GoogleAdsService
                 'geo_id'        => $row['geo_id'],
                 'date'          => $row['date'],
                 'cost'          => $row['cost'],
+                'conversions_value' => $row['conversions_value'],
                 'install'       => $row['install'],
                 'trial'         => $row['trial'],
                 'trial_convert' => $row['trial_convert'],
