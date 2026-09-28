@@ -183,3 +183,35 @@ function authExpiresAt(): ?int
     if (!session('auth_time')) return null;
     return (int) session('auth_time') + AUTH_SESSION_TTL;
 }
+
+// ── Rich text (ported from sb-hrm) ──────────────────────────────────
+/**
+ * Clean HTML from the rich text editor (Analytics notes) down to a safe set of
+ * formatting tags; strips scripts, on*= handlers and javascript:/data: URLs.
+ * Returns '' when nothing but empty markup is left.
+ */
+function sanitizeHtml(?string $html): string
+{
+    if ($html === null || trim($html) === '') {
+        return '';
+    }
+
+    // strip_tags keeps the *text* of a stripped tag, which would leave the
+    // body of a <script> behind as visible content — drop those outright.
+    $clean = preg_replace('#<(script|style|iframe|object|embed)\b[^>]*>.*?</\1>#is', '', $html);
+    $clean = preg_replace('#<(script|style|iframe|object|embed)\b[^>]*/?>#i', '', $clean);
+
+    $allowed = '<p><br><b><strong><i><em><u><s><strike><ul><ol><li><a><h1><h2><h3><blockquote><code><pre><span><div>';
+    $clean   = strip_tags($clean, $allowed);
+
+    // Drop on*="…" handlers and javascript:/data: URLs that survived strip_tags.
+    $clean = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+    $clean = preg_replace('/(href|src)\s*=\s*("|\')\s*(javascript|data|vbscript):[^"\']*(\2)/i', '$1=$2#$4', $clean);
+
+    // An editor left empty still posts "<p><br></p>"; treat that as blank.
+    if (trim(html_entity_decode(strip_tags($clean)), " \t\n\r\0\x0B\xC2\xA0") === '') {
+        return '';
+    }
+
+    return $clean;
+}

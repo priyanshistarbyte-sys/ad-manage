@@ -37,6 +37,7 @@
             <div class="offcanvas-body">
                 <div class="nav-links">
                     <a href="{{ url('/') }}"            class="nav-btn {{ $active==='home'        ? 'active':'' }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                    <a href="{{ url('/analytics') }}"   class="nav-btn {{ $active==='analytics'   ? 'active':'' }}"><i class="bi bi-pie-chart"></i> Analytics</a>
                     <a href="{{ url('/apps') }}"        class="nav-btn {{ $active==='apps'        ? 'active':'' }}"><i class="bi bi-grid-3x3-gap"></i> Apps</a>
                     <a href="{{ url('/connections') }}" class="nav-btn {{ $active==='connections' ? 'active':'' }}"><i class="bi bi-google"></i> Ad Accounts</a>
                     <a href="{{ url('/sync-all') }}"    class="nav-btn {{ $active==='sync-all'    ? 'active':'' }}"><i class="bi bi-arrow-repeat"></i> Sync All</a>

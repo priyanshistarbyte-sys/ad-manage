@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AppsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConnectionsController;
@@ -24,6 +25,11 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/report/country', [ReportController::class, 'country'])->name('report.country');
     Route::get('/report/history', [ReportController::class, 'history'])->name('report.history');
     Route::get('/report/export', [ReportController::class, 'export'])->name('report.export');
+
+    // Analytics — loss-making countries per app (selected date / 30d / 90d)
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
+    Route::get('/analytics/notes', [AnalyticsController::class, 'notes'])->name('analytics.notes');
+    Route::post('/analytics/notes', [AnalyticsController::class, 'storeNote'])->name('analytics.notes.store');
 
     // Apps management (add / edit / delete)
     Route::get('/apps', [AppsController::class, 'index'])->name('apps');
