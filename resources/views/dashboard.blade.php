@@ -168,13 +168,41 @@
         </div>
     </div>
 
-    {{-- Daily performance table (the Excel-style report, moved here) --}}
-    <div class="data-card" style="margin-bottom:16px">
-        <div class="data-card-header">
-            <span><i class="bi bi-calendar3"></i> Daily Performance</span>
-            <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} day(s)</span>
+    {{-- Daily performance — grouped by month (newest first), collapsible like Sync All:
+         the first (current) month starts open (−), the rest collapsed (+). --}}
+    @php
+        $monthGroups = $rows->sortByDesc(fn ($r) => \Carbon\Carbon::parse($r->date)->format('Y-m-d'))->groupBy(fn ($r) => \Carbon\Carbon::parse($r->date)->format('Y-m'))->sortKeysDesc();
+    @endphp
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 10px">
+        <span style="font-weight:700;color:#fff"><i class="bi bi-calendar3" style="color:var(--purple)"></i> Daily Performance</span>
+        <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} day(s) · {{ $monthGroups->count() }} month(s)</span>
+    </div>
+    @forelse ($monthGroups as $month => $mRows)
+    @php
+        $open      = $loop->first;
+        $monthDate = \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $isCurrent = $month === now()->format('Y-m');
+        $mCost     = $mRows->sum('cost');
+        $mAdRev    = $mRows->sum('ad_rev');
+        $mTotRev   = $mRows->sum('total_rev');
+        $mTrial    = $mRows->sum('trial');
+        $mInstall  = $mRows->sum('install');
+        $mTroas    = $mCost > 0 ? $mRows->sum('conversions_value') / $mCost * 100 : 0;
+        $mTrialPct = $mTrial > 0 ? $mRows->sum('trial_convert') / $mTrial * 100 : 0;
+        $mCpi      = $mInstall > 0 ? $mCost / $mInstall : 0;
+    @endphp
+    <div class="data-card daily-group" style="margin-bottom:16px">
+        <div class="data-card-header daily-group-toggle" style="cursor:pointer;user-select:none">
+            <span>
+                <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
+                <i class="bi bi-calendar3"></i> {{ $monthDate->format('F Y') }}
+                @if ($isCurrent)<span class="badge-nodata" style="margin-left:6px">Current</span>@endif
+            </span>
+            <span style="color:var(--text-muted);font-size:12px">
+                {{ $mRows->count() }} day(s) · Cost {{ $money($mCost) }} · Rev {{ $money($mTotRev) }} · TROAS {{ $pct($mTroas) }}
+            </span>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap daily-group-body" style="{{ $open ? '' : 'display:none' }}">
             <table class="ledger monthly sortable" style="width:100%;white-space:nowrap">
                 <thead>
                     <tr>
@@ -185,7 +213,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($rows as $r)
+                    @foreach ($mRows as $r)
                     @php $d = \Carbon\Carbon::parse($r->date)->format('Y-m-d'); @endphp
                     <tr>
                         <td data-sort="{{ $d }}">{{ \Carbon\Carbon::parse($r->date)->format('d-m-Y') }}</td>
@@ -207,32 +235,33 @@
                                 data-title="Country · {{ \Carbon\Carbon::parse($r->date)->format('d M Y') }}"
                                 data-url="{{ url('/report/country?' . $q(['date' => $d, 'partial' => 1])) }}">COUNTRY</button></td>
                     </tr>
-                    @empty
-                    <tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:32px">No data for these filters.</td></tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
-                @if ($rows->isNotEmpty())
                 <tfoot>
                     <tr>
                         <td>TOTAL</td>
-                        <td>{{ $money($totals->cost) }}</td>
-                        <td><span class="{{ $totals->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($totals->troas) }}</span></td>
-                        <td>{{ $money($totals->total_rev) }}</td>
-                        <td>{{ $money($totals->ad_rev) }}</td>
-                        <td>{{ $money($totals->convert_rev) }}</td>
-                        <td>{{ $money($totals->renew_rev) }}</td>
-                        <td>{{ $num($totals->trial) }}</td>
-                        <td>{{ $pct($totals->trial_convert_perc) }}</td>
-                        <td>{{ $num($totals->repeat_count) }}</td>
-                        <td>{{ $num($totals->install) }}</td>
-                        <td>{{ $money($totals->cpi) }}</td>
+                        <td>{{ $money($mCost) }}</td>
+                        <td><span class="{{ $mTroas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($mTroas) }}</span></td>
+                        <td>{{ $money($mTotRev) }}</td>
+                        <td>{{ $money($mAdRev) }}</td>
+                        <td>{{ $money($mRows->sum('convert_rev')) }}</td>
+                        <td>{{ $money($mRows->sum('renew_rev')) }}</td>
+                        <td>{{ $num($mTrial) }}</td>
+                        <td>{{ $pct($mTrialPct) }}</td>
+                        <td>{{ $num($mRows->sum('repeat_count')) }}</td>
+                        <td>{{ $num($mInstall) }}</td>
+                        <td>{{ $money($mCpi) }}</td>
                         <td></td><td></td>
                     </tr>
                 </tfoot>
-                @endif
             </table>
         </div>
     </div>
+    @empty
+    <div class="data-card" style="margin-bottom:16px">
+        <div style="text-align:center;color:var(--text-muted);padding:32px">No data for these filters.</div>
+    </div>
+    @endforelse
 
     {{-- Country TROAS rankings (honour the filters above) --}}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
@@ -356,6 +385,16 @@
                 var diff = parseFloat($(a).data(key)) - parseFloat($(b).data(key));
                 return asc ? diff : -diff;
             }).appendTo($body);
+        });
+
+        // Daily Performance month blocks — click a header to expand / collapse it.
+        $(document).on('click', '.daily-group-toggle', function () {
+            var $body = $(this).closest('.daily-group').find('.daily-group-body');
+            var willOpen = !$body.is(':visible');
+            $body.toggle(willOpen);
+            $(this).find('.toggle-icon')
+                .toggleClass('bi-dash-square', willOpen)
+                .toggleClass('bi-plus-square', !willOpen);
         });
 
         // Drill-in modal — load the History / Country partial in place instead of
