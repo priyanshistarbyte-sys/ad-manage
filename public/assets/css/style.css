@@ -862,3 +862,33 @@ table.ledger.sortable thead th.sort-desc::after { content: '↓'; opacity: 1; }
 /* ── Light theme fix-ups for Bootstrap bits that assume a dark page ── */
 :root[data-theme="light"] .btn-close-white { filter: none; }
 :root[data-theme="light"] .modal-backdrop.show { opacity: .35; }
+
+/* ── Mobile sidebar: account block ──
+   Row 1: avatar + name on the left, theme switch on the right.
+   Then Profile / Log out as full-width items, aligned with the nav links above.
+   The dropdown wrapper is flattened (display:contents) so the name, the toggle
+   and the menu all sit in the one .nav-user flex row and can be ordered. */
+@media (max-width: 767.98px) {
+    .nav-user { align-items: center; gap: 4px 8px; }
+    .nav-user .user-dropdown { display: contents; }
+
+    .nav-user .user-dropdown > .nav-user-badge,
+    .nav-user .user-dropdown > .nav-user-badge:hover {
+        order: 1; flex: 1 1 auto; min-width: 0;
+        margin: 0; padding: 6px 12px; opacity: 1;
+        background: transparent; border: 0;
+        color: var(--nav-text-strong);
+        text-transform: none; letter-spacing: .2px; font-size: 13px; font-weight: 600;
+        overflow: hidden; text-overflow: ellipsis;
+    }
+    .nav-user .user-dropdown > .nav-user-badge i { font-size: 18px; color: var(--accent-soft); }
+
+    .nav-user .theme-toggle {
+        order: 2; flex: 0 0 auto;
+        border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px;
+    }
+
+    .nav-user .nav-dropdown-menu.dropdown-menu { order: 3; width: 100%; margin-top: 4px; }
+    .nav-user .nav-dropdown-menu .dropdown-item { padding: 6px 12px; }
+    .nav-user .nav-dropdown-menu .dropdown-divider { display: none; }
+}

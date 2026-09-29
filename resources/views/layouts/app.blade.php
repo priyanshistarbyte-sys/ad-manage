@@ -62,10 +62,10 @@
                         <a href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
                            class="nav-btn nav-user-badge dropdown-toggle" title="Signed in as {{ currentUserName() }}">
                             <i class="bi bi-person-circle"></i> {{ currentUserName() ?: 'Account' }}
-                            @if (isAdmin())<span class="admin-tag">admin</span>@endif
+                            {{-- @if (isAdmin())<span class="admin-tag">admin</span>@endif --}}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end nav-dropdown-menu">
-                            <li class="dropdown-header">{{ isAdmin() ? 'Admin' : 'Account' }}</li>
+                            {{-- <li class="dropdown-header">{{ isAdmin() ? 'Admin' : 'Account' }}</li> --}}
                             <li>
                                 <a class="dropdown-item" href="{{ url('/settings#profile') }}">
                                     <i class="bi bi-person-gear"></i> Profile
