@@ -16,14 +16,14 @@
     {{-- Header --}}
     <div class="dash-header" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
-            <div class="dash-title" style="color:#fff"><i class="bi bi-table" style="color:var(--purple)"></i> Report</div>
+            <div class="dash-title" style="color:var(--text-strong)"><i class="bi bi-table" style="color:var(--purple)"></i> Report</div>
             <div class="dash-subtitle" style="color:var(--text-muted);font-size:12.5px">
                 {{ \Carbon\Carbon::parse($filters['from'])->format('d M Y') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
                 @if ($lastSynced) · <span style="font-size:11px">synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }}</span> @endif
             </div>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ url('/report/export?' . $q()) }}" class="btn-primary-custom" style="background:#1a7f37;text-decoration:none">
+            <a href="{{ url('/report/export?' . $q()) }}" class="btn-primary-custom" style="background:var(--btn-green);text-decoration:none">
                 <i class="bi bi-filetype-csv"></i> Export CSV
             </a>
             <a href="{{ url('/sync-all') }}" class="btn-primary-custom" style="text-decoration:none">
@@ -117,7 +117,7 @@
                         </tr>
                         @empty
                         <tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:32px">
-                            No data for these filters. Run <a href="{{ url('/sync-all') }}" style="color:#a78bfa">Sync All</a> first.
+                            No data for these filters. Run <a href="{{ url('/sync-all') }}" style="color:var(--accent-soft)">Sync All</a> first.
                         </td></tr>
                         @endforelse
                     </tbody>
@@ -156,7 +156,7 @@
                             @forelse ($ranking[$key] as $c)
                             <tr>
                                 <td style="text-align:left">
-                                    <a href="{{ url('/report?' . $q(['geo_id' => $c->geo_id])) }}" style="color:#fff;text-decoration:none">{{ $c->country_name }}</a>
+                                    <a href="{{ url('/report?' . $q(['geo_id' => $c->geo_id])) }}" style="color:var(--text-strong);text-decoration:none">{{ $c->country_name }}</a>
                                 </td>
                                 <td>{{ $money($c->cost) }}</td>
                                 <td>{{ $money($c->total_rev) }}</td>

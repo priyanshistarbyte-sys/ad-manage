@@ -4,18 +4,18 @@
 <div style="max-width:1100px;margin:0 auto">
 
     @if ($connections->isEmpty())
-    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fbbf24;
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--warn-fg);
                 border-radius:8px;padding:10px 16px;font-size:12.5px;margin-bottom:18px">
         <i class="bi bi-exclamation-triangle"></i>
         No ad accounts yet. Add a Google Ads Manager account on the
-        <a href="{{ url('/connections') }}" style="color:#fcd34d">Ad Accounts</a> page so a sync can pull data. Apps here are
+        <a href="{{ url('/connections') }}" style="color:var(--warn-link)">Ad Accounts</a> page so a sync can pull data. Apps here are
         matched to campaigns automatically by their App ID.
     </div>
     @endif
 
     {{-- Add / edit app --}}
     <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:22px">
-        <h5 style="color:#fff;margin:0 0 6px">
+        <h5 style="color:var(--text-strong);margin:0 0 6px">
             <i class="bi bi-{{ $editing ? 'pencil-square' : 'plus-circle' }}" style="color:var(--purple)"></i>
             {{ $editing ? 'Edit App' : 'Add App' }}
         </h5>
@@ -59,7 +59,7 @@
 
     {{-- App list --}}
     <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);color:#fff;font-weight:600">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);color:var(--text-strong);font-weight:600">
             <i class="bi bi-grid-3x3-gap"></i> Your Apps <span style="color:var(--text-muted);font-weight:400">({{ $apps->count() }})</span>
         </div>
         <div class="table-wrap">
@@ -75,8 +75,8 @@
                 <tbody>
                     @forelse ($apps as $app)
                     <tr>
-                        <td style="font-weight:600;color:#fff">{{ $app->name }}</td>
-                        <td><code style="color:#a78bfa">{{ $app->package_id }}</code></td>
+                        <td style="font-weight:600;color:var(--text-strong)">{{ $app->name }}</td>
+                        <td><code style="color:var(--accent-soft)">{{ $app->package_id }}</code></td>
                         <td>
                             @if (in_array($app->id, $syncedAppIds))
                                 <span class="badge-profit" title="Campaigns matched to this App ID have synced data">Synced</span>
@@ -85,7 +85,7 @@
                             @endif
                         </td>
                         <td style="text-align:right;white-space:nowrap">
-                            <a href="{{ url('/apps/'.$app->id.'/edit') }}" style="color:#a78bfa;margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{{ url('/apps/'.$app->id.'/edit') }}" style="color:var(--accent-soft);margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url('/apps/'.$app->id) }}"
                                   onsubmit="return confirm('Remove {{ $app->name }}?')" style="display:inline">
                                 @csrf @method('DELETE')

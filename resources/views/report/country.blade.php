@@ -11,7 +11,7 @@
 <div style="max-width:1400px;margin:0 auto">
     <div class="dash-header" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
-            <div class="dash-title" style="color:#fff"><i class="bi bi-globe2" style="color:var(--purple)"></i> Country Report</div>
+            <div class="dash-title" style="color:var(--text-strong)"><i class="bi bi-globe2" style="color:var(--purple)"></i> Country Report</div>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ url('/?' . $q()) }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted);align-self:center">

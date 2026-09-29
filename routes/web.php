@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public ──
 Route::match(['get', 'post'], '/login', [AuthController::class, 'login'])->name('login');
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::post('/logout',[AuthController::class, 'logout'])->name('logout');
 Route::match(['get', 'post'], '/setup', [SetupController::class, 'run'])->name('setup');
 
 // ── Authenticated ──
@@ -45,6 +45,7 @@ Route::middleware('auth.pin')->group(function () {
     // Settings — app-wide preferences (history view window, …)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
     Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
 
     // Ad Accounts — Google Ads Manager connections (per-MCC credentials)
     Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');

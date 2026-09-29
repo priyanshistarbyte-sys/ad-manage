@@ -13,7 +13,7 @@
     <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
                 background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px">
         <div>
-            <h5 style="color:#fff;margin:0"><i class="bi bi-arrow-repeat" style="color:var(--purple)"></i> Sync All Campaigns</h5>
+            <h5 style="color:var(--text-strong);margin:0"><i class="bi bi-arrow-repeat" style="color:var(--purple)"></i> Sync All Campaigns</h5>
             <p style="color:var(--text-muted);font-size:12.5px;margin:6px 0 0">
                 Pulls <strong>every campaign</strong> from every account your Ad Account credentials can access,
                 for <strong>this month</strong> ({{ \Carbon\Carbon::parse($periodStart)->format('d M') }} → {{ \Carbon\Carbon::parse($periodEnd)->format('d M Y') }}).
@@ -24,29 +24,52 @@
         </div>
         <form method="post" action="{{ url('/sync-all') }}">
             @csrf
-            <button type="submit" class="btn-primary-custom" style="background:#1a7f37;font-size:14px;padding:10px 20px"
+            <button type="submit" class="btn-primary-custom" style="background:var(--btn-green);font-size:14px;padding:10px 20px"
                     onclick="this.innerHTML='<i class=\'bi bi-hourglass-split\'></i> Syncing…';this.disabled=true;this.form.submit();">
                 <i class="bi bi-arrow-repeat"></i> Sync All Now
             </button>
         </form>
     </div>
 
-    <div style="background:rgba(167,139,250,.06);border:1px solid #a78bfa33;border-radius:10px;
+    <div style="background:rgba(167,139,250,.06);border:1px solid var(--border-strong);border-radius:10px;
                 padding:12px 18px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px">
-        <i class="bi bi-info-circle" style="color:#a78bfa"></i>
-        Synced campaigns are matched to your apps automatically by <strong style="color:#fff">App ID</strong>.
-        Add an app with just its <strong style="color:#fff">App name</strong> and <strong style="color:#fff">App ID</strong>
-        on the <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page.
+        <i class="bi bi-info-circle" style="color:var(--accent-soft)"></i>
+        Synced campaigns are matched to your apps automatically by <strong style="color:var(--text-strong)">App ID</strong>.
+        Add an app with just its <strong style="color:var(--text-strong)">App name</strong> and <strong style="color:var(--text-strong)">App ID</strong>
+        on the <a href="{{ url('/apps') }}" style="color:var(--accent-soft)">Apps</a> page.
     </div>
 
     @if ($connections->isEmpty())
-    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fbbf24;
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--warn-fg);
                 border-radius:8px;padding:12px 18px;font-size:13px;margin-bottom:18px">
         <i class="bi bi-exclamation-triangle"></i>
         No Ad Accounts yet. Add one with credentials on the
-        <a href="{{ url('/connections') }}" style="color:#fcd34d">Ad Accounts</a> page first.
+        <a href="{{ url('/connections') }}" style="color:var(--warn-link)">Ad Accounts</a> page first.
     </div>
     @endif
+
+    {{-- Filters — same layout as the Dashboard / Analytics filter bars; applies on change --}}
+    @php $shown = $grouped->flatten(1); @endphp
+    <form method="get" action="{{ url('/sync-all') }}" id="syncFilters" class="data-card" style="padding:14px 16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,240px));gap:12px;align-items:end">
+            <div>
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" @selected($status === '')>All</option>
+                    <option value="ENABLED" @selected($status === 'ENABLED')>ENABLED</option>
+                    <option value="REMOVED" @selected($status === 'REMOVED')>REMOVED</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="{{ url('/sync-all') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted)">Reset</a>
+            </div>
+        </div>
+        <div style="margin-top:12px;color:var(--text-muted);font-size:12px">
+            Showing <strong>{{ $status === '' ? 'all' : $status }}</strong> campaigns
+            · {{ $shown->count() }} row(s) across {{ $grouped->count() }} month(s)
+            · Cost {{ $money($shown->sum('cost')) }}
+        </div>
+    </form>
 
     {{-- Results grouped by month (newest first) — collapsible; current/first month open, rest collapsed --}}
     @forelse ($grouped as $month => $rows)
@@ -79,7 +102,7 @@
                     @foreach ($rows as $s)
                     <tr>
                         <td style="text-align:left" data-sort="{{ $s->campaign_name ?: $s->campaign_id }}">
-                            <div style="font-weight:600;color:#fff">{{ $s->campaign_name ?: $s->campaign_id }}</div>
+                            <div style="font-weight:600;color:var(--text-strong)">{{ $s->campaign_name ?: $s->campaign_id }}</div>
                             <div style="color:var(--text-muted);font-size:11px">{{ optional($s->connection)->name }} · {{ $s->account_name ?: $s->customer_id }}</div>
                         </td>
                         <td><span class="badge-nodata">{{ $s->status ?: '—' }}</span></td>
@@ -100,7 +123,12 @@
     <div class="data-card">
         <div style="text-align:center;color:var(--text-muted);padding:36px">
             <i class="bi bi-inbox" style="font-size:1.8rem;display:block;margin-bottom:8px"></i>
-            No campaigns synced yet. Click <strong style="color:#fff">Sync All Now</strong> to pull data from Google Ads.
+            @if ($status !== '')
+            No <strong style="color:var(--text-strong)">{{ $status }}</strong> campaigns found.
+            <a href="{{ url('/sync-all') }}" style="color:var(--accent-soft)">Show all</a>
+            @else
+            No campaigns synced yet. Click <strong style="color:var(--text-strong)">Sync All Now</strong> to pull data from Google Ads.
+            @endif
         </div>
     </div>
     @endforelse
@@ -109,6 +137,16 @@
 
 @section('scripts')
 <script>
+    // Filters apply instantly (like the Dashboard): picking a status reloads the
+    // page; the bar is dimmed while it loads.
+    document.querySelectorAll('#syncFilters select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            var form = document.getElementById('syncFilters');
+            form.style.opacity = .6; form.style.pointerEvents = 'none';
+            form.submit();
+        });
+    });
+
     // Collapse / expand each month group. Newest month starts open (−), the rest
     // collapsed (+); clicking a header toggles that group.
     document.querySelectorAll('.sync-group-toggle').forEach(function (header) {

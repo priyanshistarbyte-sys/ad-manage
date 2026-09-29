@@ -15,21 +15,21 @@
         background: transparent; border: 1px solid transparent; border-radius: 4px;
         color: var(--text-muted); width: 28px; height: 26px; font-size: 12px; cursor: pointer;
     }
-    .rich-editor-toolbar button:hover { background: #2e2e6a; color: #fff; border-color: var(--border); }
+    .rich-editor-toolbar button:hover { background: var(--surface-btn-hover); color: var(--text-strong); border-color: var(--border); }
     .rich-editor-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
     .rich-editor-area {
         min-height: 150px; max-height: 340px; overflow-y: auto;
         padding: 12px; color: var(--text); font-size: 13px; line-height: 1.6; outline: none;
     }
-    .rich-editor-area:empty::before { content: attr(data-placeholder); color: #55557a; }
+    .rich-editor-area:empty::before { content: attr(data-placeholder); color: var(--text-faint); }
     .rich-editor-area:focus { box-shadow: inset 0 0 0 2px rgba(108,63,197,.35); }
     /* Same formatting inside the editor and in saved notes */
-    .rich-editor-area h3, .an-note-text h3 { font-size: 15px; color: #fff; margin: 0 0 6px; }
+    .rich-editor-area h3, .an-note-text h3 { font-size: 15px; color: var(--text-strong); margin: 0 0 6px; }
     .rich-editor-area ul, .rich-editor-area ol, .an-note-text ul, .an-note-text ol { padding-left: 22px; margin-bottom: 8px; }
     .rich-editor-area blockquote, .an-note-text blockquote {
         border-left: 3px solid var(--purple); margin: 8px 0; padding: 2px 0 2px 12px; color: var(--text-muted);
     }
-    .rich-editor-area a, .an-note-text a { color: #60a5fa; }
+    .rich-editor-area a, .an-note-text a { color: var(--info); }
     .an-note-text p { margin: 0 0 6px; }
     .an-note-text > :last-child { margin-bottom: 0; }
 
@@ -40,22 +40,22 @@
         background: var(--header-bg); color: var(--text-muted); font-size: 11px; font-weight: 600;
         text-transform: uppercase; letter-spacing: .4px; text-align: center;
     }
-    table.an-tbl thead tr:first-child th { color: #fff; font-size: 12px; }
-    table.an-tbl thead th.grp { border-bottom-color: #3a3a70; }
+    table.an-tbl thead tr:first-child th { color: var(--text-strong); font-size: 12px; }
+    table.an-tbl thead th.grp { border-bottom-color: var(--border-strong); }
     table.an-tbl tbody tr:hover td { background: var(--row-hover); }
     table.an-tbl th.an-sort { cursor: pointer; user-select: none; }
-    table.an-tbl th.an-sort:hover { color: #a78bfa; }
+    table.an-tbl th.an-sort:hover { color: var(--accent-soft); }
     table.an-tbl th.an-sort::after { content: ' ⇅'; opacity: .4; }
     table.an-tbl th.an-sort.sort-asc,
-    table.an-tbl th.an-sort.sort-desc { color: #a78bfa; }
+    table.an-tbl th.an-sort.sort-desc { color: var(--accent-soft); }
     table.an-tbl th.an-sort.sort-asc::after  { content: ' ↑'; opacity: 1; }
     table.an-tbl th.an-sort.sort-desc::after { content: ' ↓'; opacity: 1; }
     table.an-tbl td { color: var(--text); text-align: center; vertical-align: middle; }
-    table.an-tbl td.country { text-align: left; font-weight: 600; color: #fff; }
+    table.an-tbl td.country { text-align: left; font-weight: 600; color: var(--text-strong); }
     table.an-tbl td.country .code { color: var(--text-muted); font-size: 11px; font-weight: 500; margin-left: 4px; }
     table.an-tbl td.troas { text-align: center; }
     table.an-tbl td.troas .loss { display: inline-block; font-size: 12px; margin-left: 6px; vertical-align: middle; }
-    table.an-tbl td.flag { background: #1c0a14; }
+    table.an-tbl td.flag { background: var(--flag-bg); }
     table.an-tbl td.notes { text-align: center; }
     /* Notes icons: ✓ = Solved (direct toggle), ✎ = Mark as read / notes popup */
     .an-icon-btn {
@@ -63,35 +63,35 @@
         width: 30px; height: 28px; margin: 0 2px; color: var(--text-muted); font-size: 15px;
         cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .15s;
     }
-    .an-icon-btn:hover { color: #fff; border-color: var(--purple); background: #1e1e42; }
+    .an-icon-btn:hover { color: var(--text-strong); border-color: var(--purple); background: var(--surface-btn); }
     .an-icon-btn:disabled { opacity: .5; cursor: wait; }
     /* Solved icon: plain tick, same style as the edit pencil; yellow once solved */
-    .an-solve { border: none; background: transparent; color: #a78bfa; font-size: 17px; }
-    .an-solve:hover { border: none; background: transparent; color: #c4b5fd; }
+    .an-solve { border: none; background: transparent; color: var(--accent-soft); font-size: 17px; }
+    .an-solve:hover { border: none; background: transparent; color: var(--accent-soft-hover); }
     .an-solve.on, .an-solve.on:hover { color: var(--gold); }
     /* Edit (notes) icon: plain purple pencil, same as the Apps page's edit action */
-    .an-edit { border: none; background: transparent; color: #a78bfa; font-size: 14px; }
-    .an-edit:hover { border: none; background: transparent; color: #c4b5fd; }
-    .an-edit.on { color: #60a5fa; }
+    .an-edit { border: none; background: transparent; color: var(--accent-soft); font-size: 14px; }
+    .an-edit:hover { border: none; background: transparent; color: var(--accent-soft-hover); }
+    .an-edit.on { color: var(--info); }
     /* Solved countries: whole row in yellow */
     table.an-tbl tr.solved td,
-    table.an-tbl tr.solved td.flag { background: #3a3000; }
+    table.an-tbl tr.solved td.flag { background: var(--solved-bg); }
     table.an-tbl tr.solved td.country,
     table.an-tbl tr.solved td:not(.troas) { color: var(--gold); }
     /* Notes popup */
     .an-notes-day { margin-top: 16px; }
-    .an-notes-day h6 { color: #a78bfa; font-size: 12px; font-weight: 700; margin: 0 0 8px; letter-spacing: .4px; }
-    .an-note-item { background: #0f0f24; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; }
-    .an-note-item.solved { border-color: #6b5a00; background: #2a2300; }
+    .an-notes-day h6 { color: var(--accent-soft); font-size: 12px; font-weight: 700; margin: 0 0 8px; letter-spacing: .4px; }
+    .an-note-item { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; }
+    .an-note-item.solved { border-color: var(--solved-bd); background: var(--solved-bg-soft); }
     .an-note-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--text-muted); font-size: 11.5px; }
     .an-note-text { color: var(--text); font-size: 13px; line-height: 1.6; margin-top: 5px; word-break: break-word; }
     .an-note-item.solved .an-note-text { color: var(--gold); }
-    .badge-solved { background: #3a3000; color: var(--gold); border: 1px solid #6b5a00; border-radius: 5px; padding: 1px 7px; font-size: 10.5px; font-weight: 700; }
-    .badge-read   { background: #0d1a33; color: #60a5fa; border: 1px solid #1a4a88; border-radius: 5px; padding: 1px 7px; font-size: 10.5px; font-weight: 700; }
+    .badge-solved { background: var(--solved-bg); color: var(--gold); border: 1px solid var(--solved-bd); border-radius: 5px; padding: 1px 7px; font-size: 10.5px; font-weight: 700; }
+    .badge-read   { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-bd); border-radius: 5px; padding: 1px 7px; font-size: 10.5px; font-weight: 700; }
     .an-toggle { display: inline-flex; align-items: center; gap: 6px; margin-right: 18px; color: var(--text); font-size: 13px; cursor: pointer; }
     .an-toggle input { width: 16px; height: 16px; accent-color: var(--purple); }
     .an-toggle.solved input { accent-color: var(--gold); }
-    table.an-tbl tfoot td { font-weight: 700; color: #fff; background: var(--navy-mid); }
+    table.an-tbl tfoot td { font-weight: 700; color: var(--text-strong); background: var(--navy-mid); }
     table.an-tbl tfoot td:first-child { text-align: left; }
     .an-app-sum { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; font-weight: 500; color: var(--text-muted); }
     .an-app-sum b { font-weight: 700; }
@@ -122,7 +122,7 @@
 <div style="max-width:1400px;margin:0 auto">
 
     {{-- Filters --}}
-    <form method="get" action="{{ url('/analytics') }}" class="data-card" style="padding:14px 16px;margin-bottom:16px">
+    <form method="get" action="{{ url('/analytics') }}" id="anFilters" class="data-card" style="padding:14px 16px;margin-bottom:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end">
             <div>
                 <label class="form-label">Date range</label>
@@ -153,7 +153,6 @@
                 </select>
             </div>
             <div class="d-flex gap-2 align-items-center">
-                <button class="btn-primary-custom" type="submit"><i class="bi bi-funnel"></i> Apply</button>
                 <a href="{{ url('/analytics') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted)">Reset</a>
             </div>
         </div>
@@ -238,7 +237,11 @@
                     <tr class="{{ $st?->solved ? 'solved' : '' }}" data-app="{{ $app->id }}" data-geo="{{ $c->geo_id }}"
                         data-solved="{{ $st?->solved ? 1 : 0 }}" data-read="{{ $st?->read ? 1 : 0 }}"
                         data-title="{{ $app->name }} · {{ $c->country_name }}">
-                        <td class="country" data-sort="{{ $c->country_name }}">{{ $c->country_name }}<span class="code">{{ $c->country_code }}</span></td>
+                        {{-- <td class="country" data-sort="{{ $c->country_name }}">{{ $c->country_name }}<span class="code">{{ $c->country_code }}</span></td> --}}
+                        <td class="country" data-sort="{{ $c->country_name }}">
+                            <span class="code">{{ $c->country_code }}</span>
+                            {{ $c->country_name }}
+                        </td>
                         @foreach ($labels as $k => $label)
                         @php $p = $c->periods[$k]; @endphp
                         <td data-sort="{{ $p->cost }}">{{ $money($p->cost) }}</td>
@@ -285,7 +288,7 @@
     </div>
     @empty
     <div class="data-card" style="text-align:center;padding:40px;color:var(--text-muted)">
-        No apps yet. Add one on the <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page.
+        No apps yet. Add one on the <a href="{{ url('/apps') }}" style="color:var(--accent-soft)">Apps</a> page.
     </div>
     @endforelse
 </div>
@@ -380,6 +383,14 @@
         $box.on('apply.daterangepicker', function (e, p) {
             apply(p.startDate, p.endDate);
             $box.closest('form').trigger('submit');
+        });
+
+        // Filters apply instantly: the "Loss in" dropdown reloads on pick; the
+        // Cost / TROAS boxes reload on 'change' (Enter, spinner arrows or leaving
+        // the box) so typing "100" doesn't reload after every digit. The form is
+        // dimmed while the page loads so a second change isn't lost.
+        $('#anFilters select, #anFilters input[type=number]').on('change', function () {
+            $('#anFilters').css({ opacity: .6, pointerEvents: 'none' }).trigger('submit');
         });
     });
 </script>

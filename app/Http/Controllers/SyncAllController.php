@@ -12,12 +12,21 @@ use Illuminate\Support\Facades\DB;
 
 class SyncAllController extends Controller
 {
-    public function index()
+    /** Campaign statuses the Sync All page can filter by ('' = all). */
+    public const STATUS_FILTERS = ['ENABLED', 'REMOVED'];
+
+    public function index(Request $request)
     {
+        $status = strtoupper((string) $request->query('status', ''));
+        if (!in_array($status, self::STATUS_FILTERS, true)) {
+            $status = '';
+        }
+
         return view('sync-all', [
             'activePage'   => 'sync-all',
             'pageTitle'    => 'Sync All',
-            'grouped'      => $this->campaignsByMonth(),
+            'grouped'      => $this->campaignsByMonth($status),
+            'status'       => $status,
             'connections'  => Connection::where('active', true)->get(),
             'apps'         => App::with('connection')->orderBy('name')->get(),
             'lastSynced'   => CampaignStat::max('synced_at'),
@@ -32,7 +41,7 @@ class SyncAllController extends Controller
      * status / type come from campaign_stats. Campaigns synced this month with
      * no spend yet (e.g. paused) still appear in the current month with zeros.
      */
-    private function campaignsByMonth()
+    private function campaignsByMonth(string $status = '')
     {
         $monthExpr = DB::connection()->getDriverName() === 'sqlite'
             ? "strftime('%Y-%m', date)"
@@ -78,6 +87,10 @@ class SyncAllController extends Controller
                 $zero->month = $current;
                 $rows->push($zero);
             }
+        }
+
+        if ($status !== '') {
+            $rows = $rows->filter(fn ($r) => strtoupper((string) $r->status) === $status);
         }
 
         return $rows->sortByDesc('cost')

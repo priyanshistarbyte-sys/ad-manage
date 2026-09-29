@@ -123,11 +123,15 @@ class ReportService
             ->values();
     }
 
-    /** Dropdown option data for the filter bar. */
-    public function filterOptions(): array
+    /**
+     * Dropdown option data for the filter bar. With $appId, the campaign list is
+     * narrowed to that app's campaigns (null = every app's campaigns).
+     */
+    public function filterOptions(?int $appId = null): array
     {
         $campaigns = DailyStat::query()
             ->whereNotNull('app_id')
+            ->when($appId, fn ($q) => $q->where('app_id', $appId))
             ->selectRaw('MAX(campaign_name) as campaign_name, campaign_id')
             ->groupBy('campaign_id')
             ->orderBy('campaign_name')

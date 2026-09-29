@@ -14,7 +14,7 @@
     {{-- Header + actions --}}
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
-            <h5 style="color:#fff;margin:0"><i class="bi bi-google" style="color:var(--purple)"></i> Ad Accounts</h5>
+            <h5 style="color:var(--text-strong);margin:0"><i class="bi bi-google" style="color:var(--purple)"></i> Ad Accounts</h5>
             <p style="color:var(--text-muted);font-size:12px;margin:4px 0 0">
                 Google Ads Manager (MCC) accounts and their API credentials.
             </p>
@@ -39,7 +39,7 @@
                 @csrf
                 <input type="hidden" name="from" class="js-sync-from" value="{{ $rangeFrom }}">
                 <input type="hidden" name="to"   class="js-sync-to"   value="{{ $rangeTo }}">
-                <button type="submit" class="btn-primary-custom" style="background:#1a7f37"
+                <button type="submit" class="btn-primary-custom" style="background:var(--btn-green)"
                         onclick="this.innerHTML='<i class=\'bi bi-hourglass-split\'></i> Syncing…';this.disabled=true;this.form.submit();">
                     <i class="bi bi-arrow-repeat"></i> Sync All
                 </button>
@@ -49,7 +49,7 @@
 
     {{-- Connection list --}}
     <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);color:#fff;font-weight:600">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);color:var(--text-strong);font-weight:600">
             <i class="bi bi-google"></i> Ad Accounts <span style="color:var(--text-muted);font-weight:400">({{ $connections->count() }})</span>
         </div>
         <div class="table-wrap">
@@ -66,7 +66,7 @@
                 <tbody>
                     @forelse ($connections as $c)
                     <tr>
-                        <td style="font-weight:600;color:#fff">{{ $c->name }}</td>
+                        <td style="font-weight:600;color:var(--text-strong)">{{ $c->name }}</td>
                         <td>{{ $c->login_customer_id ?: '—' }}</td>
                         <td>{{ $c->apps_count }}</td>
                         <td>
@@ -75,7 +75,7 @@
                                     <span class="badge-loss" title="{{ $c->last_signin_error }}">
                                         <i class="bi bi-exclamation-octagon"></i> Reconnect
                                     </span>
-                                    <div style="color:#f85149;font-size:10px;margin-top:3px;max-width:220px;white-space:normal">
+                                    <div style="color:var(--red);font-size:10px;margin-top:3px;max-width:220px;white-space:normal">
                                         Sign-in failed{{ $c->last_signin_at ? ' ' . \Carbon\Carbon::parse($c->last_signin_at)->diffForHumans() : '' }} — update the Refresh Token, then Test.
                                     </div>
                                 @elseif ($c->last_signin_ok === true)
@@ -88,7 +88,7 @@
                                     <div style="color:var(--text-muted);font-size:10px;margin-top:3px">not tested yet</div>
                                 @endif
                                 @unless (\Illuminate\Support\Str::startsWith((string) $c->client_secret, 'GOCSPX-'))
-                                <div style="color:#fbbf24;font-size:10px;margin-top:3px" title="Google OAuth client secrets start with GOCSPX-">
+                                <div style="color:var(--warn-fg);font-size:10px;margin-top:3px" title="Google OAuth client secrets start with GOCSPX-">
                                     <i class="bi bi-exclamation-triangle"></i> secret ≠ GOCSPX-…
                                 </div>
                                 @endunless
@@ -103,18 +103,18 @@
                                 @csrf
                                 <input type="hidden" name="from" class="js-sync-from" value="{{ $rangeFrom }}">
                                 <input type="hidden" name="to"   class="js-sync-to"   value="{{ $rangeTo }}">
-                                <button type="submit" class="btn-sm-custom" style="margin-right:8px;background:var(--purple);border:none;color:#fff;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer" title="Sync only this ad account for the selected date range">
+                                <button type="submit" class="btn-sm-custom" style="margin-right:8px;background:var(--purple);border:none;color:var(--on-accent);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer" title="Sync only this ad account for the selected date range">
                                     <i class="bi bi-arrow-repeat"></i> Sync
                                 </button>
                             </form>
                             <form method="post" action="{{ url('/connections/'.$c->id.'/test') }}" style="display:inline">
                                 @csrf
-                                <button type="submit" class="btn-sm-custom" style="margin-right:10px;background:#1a7f37;border:none;color:#fff;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer" title="Test sign-in only">
+                                <button type="submit" class="btn-sm-custom" style="margin-right:10px;background:var(--btn-green);border:none;color:var(--on-accent);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer" title="Test sign-in only">
                                     <i class="bi bi-plug"></i> Test
                                 </button>
                             </form>
                             @endif
-                            <a href="{{ url('/connections/'.$c->id.'/edit') }}" style="color:#a78bfa;margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{{ url('/connections/'.$c->id.'/edit') }}" style="color:var(--accent-soft);margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url('/connections/'.$c->id) }}"
                                   onsubmit="return confirm('Remove {{ $c->name }}? Apps using it will be unlinked.')" style="display:inline">
                                 @csrf @method('DELETE')
@@ -124,7 +124,7 @@
                     </tr>
                     @empty
                     <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:26px">
-                        No ad accounts yet. Click <strong style="color:#fff">Add Account</strong> to add your first Google Ads Manager account.
+                        No ad accounts yet. Click <strong style="color:var(--text-strong)">Add Account</strong> to add your first Google Ads Manager account.
                     </td></tr>
                     @endforelse
                 </tbody>
@@ -161,7 +161,7 @@
                                    value="{{ old('name', $editing->name ?? '') }}">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Login Customer ID <small style="text-transform:none;color:#6b6b8a">(Manager acct)</small></label>
+                            <label class="form-label">Login Customer ID <small style="text-transform:none;color:var(--text-muted)">(Manager acct)</small></label>
                             <input type="text" name="login_customer_id" class="form-control" maxlength="20"
                                    placeholder="123-456-7890"
                                    value="{{ old('login_customer_id', $editing->login_customer_id ?? '') }}">
@@ -188,12 +188,12 @@
                                    value="{{ old('client_id', $editing->client_id ?? '') }}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">OAuth Client Secret <small style="text-transform:none;color:#6b6b8a">(starts with GOCSPX-)</small></label>
+                            <label class="form-label">OAuth Client Secret <small style="text-transform:none;color:var(--text-muted)">(starts with GOCSPX-)</small></label>
                             <input type="text" name="client_secret" class="form-control" autocomplete="off" spellcheck="false"
                                    placeholder="GOCSPX-…" value="{{ old('client_secret', $editing->client_secret ?? '') }}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Refresh Token <small style="text-transform:none;color:#6b6b8a">(starts with 1//)</small></label>
+                            <label class="form-label">Refresh Token <small style="text-transform:none;color:var(--text-muted)">(starts with 1//)</small></label>
                             <input type="text" name="refresh_token" class="form-control" autocomplete="off" spellcheck="false"
                                    placeholder="1//…" value="{{ old('refresh_token', $editing->refresh_token ?? '') }}">
                         </div>
