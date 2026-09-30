@@ -192,7 +192,7 @@
         <div class="data-card-header an-group-toggle" style="flex-wrap:wrap;cursor:pointer;user-select:none">
             <span>
                 <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
-                <i class="bi bi-phone" style="color:var(--purple)"></i> {{ $app->name }}
+                 {{ $app->name }}
                 <span style="color:var(--text-muted);font-weight:500;font-size:11.5px;margin-left:6px">{{ $app->package_id }}</span>
                 <span class="{{ $app->countries->isNotEmpty() ? 'badge-loss' : 'badge-profit' }}" style="margin-left:8px">
                     {{ $app->countries->count() }} loss {{ Str::plural('country', $app->countries->count()) }}
