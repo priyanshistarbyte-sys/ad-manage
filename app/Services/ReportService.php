@@ -59,7 +59,7 @@ class ReportService
             ->when($f['to'],          fn ($q, $v) => $q->whereDate('date', '<=', $v));
     }
 
-    /** One aggregated row per DATE (the Excel main table), newest date first? No — ascending. */
+    /** One aggregated row per DATE (the Excel main table), oldest first. */
     public function dailyRows(array $f): Collection
     {
         return $this->baseQuery($f)
@@ -120,16 +120,22 @@ class ReportService
             ->values();
     }
 
-    /** Dropdown option data for the filter bar. */
-    public function filterOptions(): array
+    /**
+     * Dropdown option data for the filter bar. When an app is selected, the
+     * campaign and country lists only show what that app actually has.
+     */
+    public function filterOptions(array $f = []): array
     {
+        $appId = $f['app_id'] ?? null;
+
         $campaigns = DailyStat::query()
+            ->when($appId, fn ($q, $v) => $q->where('app_id', $v))
             ->selectRaw('MAX(campaign_name) as campaign_name, campaign_id')
             ->groupBy('campaign_id')
             ->orderBy('campaign_name')
             ->get();
 
-        $geoIds = DailyStat::query()->whereNotNull('geo_id')->distinct()->pluck('geo_id');
+        $geoIds = DailyStat::query()->when($appId, fn ($q, $v) => $q->where('app_id', $v))->whereNotNull('geo_id')->distinct()->pluck('geo_id');
         $countries = $geoIds
             ->map(fn ($id) => (object) ['geo_id' => (int) $id, 'name' => Country::nameFor((int) $id)])
             ->sortBy('name')->values();

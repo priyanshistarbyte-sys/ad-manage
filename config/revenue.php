@@ -28,4 +28,8 @@ return [
     // If a conversion action matches nothing above, fold its VALUE into this
     // bucket and its COUNT into install (so no data is silently dropped).
     'fallback_value_bucket' => 'convert_rev',
+
+    // daily_stat_history snapshots older than this many days are pruned after
+    // each sync (0 = keep forever).
+    'history_retention_days' => (int) env('HISTORY_RETENTION_DAYS', 90),
 ];

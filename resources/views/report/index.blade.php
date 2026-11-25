@@ -37,7 +37,7 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end">
             <div>
                 <label class="form-label">Filter — App</label>
-                <select name="app_id" class="form-select">
+                <select name="app_id" class="form-select" onchange="this.form.campaign_id.value='';this.form.submit()">
                     <option value="">All apps</option>
                     @foreach ($options['apps'] as $app)
                         <option value="{{ $app->id }}" @selected($filters['app_id'] == $app->id)>{{ $app->name }}</option>

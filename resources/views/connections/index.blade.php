@@ -10,7 +10,7 @@
             {{ $editing ? 'Edit Ad Account' : 'Add Ad Account (Google Ads Manager)' }}
         </h5>
         <p style="color:var(--text-muted);font-size:12px;margin:0 0 18px">
-            Each Google Ads Manager (MCC) account has its own API credentials. Apps then pick which account they belong to.
+            Each Google Ads Manager (MCC) account has its own API credentials. Campaigns from every account these credentials reach are matched to your Apps by App ID.
         </p>
 
         <form method="post" action="{{ $editing ? url('/connections/'.$editing->id) : url('/connections') }}">
@@ -25,10 +25,11 @@
                            value="{{ old('name', $editing->name ?? '') }}">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Login Customer ID <small style="text-transform:none;color:#6b6b8a">(Manager acct)</small></label>
+                    <label class="form-label">Login Customer ID <small style="text-transform:none;color:#6b6b8a">(Manager acct)</small> <button type="button" class="cred-q" data-guide-step="2" title="How do I get this?"><i class="bi bi-question-circle"></i></button></label>
                     <input type="text" name="login_customer_id" class="form-control" maxlength="20"
                            placeholder="123-456-7890"
                            value="{{ old('login_customer_id', $editing->login_customer_id ?? '') }}">
+                    <small class="field-hint">Top-right of your Manager account in Google Ads.</small>
                 </div>
             </div>
 
@@ -38,28 +39,42 @@
                 </span>
             </div>
 
+            {{-- How to get each credential --}}
+            {{-- Opens the step-by-step credential guide popup --}}
+            <div class="cred-help-bar">
+                <i class="bi bi-lightbulb"></i>
+                <span>Don't have these yet? It takes about 10 minutes, one time.</span>
+                <button type="button" class="cred-help-btn" data-guide-step="1">
+                    <i class="bi bi-journal-text"></i> Step-by-step guide
+                </button>
+            </div>
+
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">Developer Token</label>
+                    <label class="form-label">Developer Token <button type="button" class="cred-q" data-guide-step="3" title="How do I get this?"><i class="bi bi-question-circle"></i></button></label>
                     <input type="text" name="developer_token" class="form-control" maxlength="191"
                            placeholder="Manager account → API Center"
                            value="{{ old('developer_token', $editing->developer_token ?? '') }}">
+                    <small class="field-hint">Manager account → Admin → API Center.</small>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">OAuth Client ID</label>
+                    <label class="form-label">OAuth Client ID <button type="button" class="cred-q" data-guide-step="6" title="How do I get this?"><i class="bi bi-question-circle"></i></button></label>
                     <input type="text" name="client_id" class="form-control" maxlength="191"
                            placeholder="…apps.googleusercontent.com"
                            value="{{ old('client_id', $editing->client_id ?? '') }}">
+                    <small class="field-hint">Google Cloud Console → Credentials → OAuth client (Web application).</small>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">OAuth Client Secret <small style="text-transform:none;color:#6b6b8a">(starts with GOCSPX-)</small></label>
-                    <input type="text" name="client_secret" class="form-control" autocomplete="off" spellcheck="false"
-                           placeholder="GOCSPX-…" value="{{ old('client_secret', $editing->client_secret ?? '') }}">
+                    <label class="form-label">OAuth Client Secret <small style="text-transform:none;color:#6b6b8a">(starts with GOCSPX-)</small> <button type="button" class="cred-q" data-guide-step="6" title="How do I get this?"><i class="bi bi-question-circle"></i></button></label>
+                    <input type="password" name="client_secret" class="form-control" autocomplete="new-password" spellcheck="false"
+                           placeholder="{{ $editing && filled($editing->client_secret) ? '•••••• saved — leave blank to keep' : 'GOCSPX-…' }}">
+                    <small class="field-hint">Shown next to the Client ID in Google Cloud Console.</small>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Refresh Token <small style="text-transform:none;color:#6b6b8a">(starts with 1//)</small></label>
-                    <input type="text" name="refresh_token" class="form-control" autocomplete="off" spellcheck="false"
-                           placeholder="1//…" value="{{ old('refresh_token', $editing->refresh_token ?? '') }}">
+                    <label class="form-label">Refresh Token <small style="text-transform:none;color:#6b6b8a">(starts with 1//)</small> <button type="button" class="cred-q" data-guide-step="7" title="How do I get this?"><i class="bi bi-question-circle"></i></button></label>
+                    <input type="password" name="refresh_token" class="form-control" autocomplete="new-password" spellcheck="false"
+                           placeholder="{{ $editing && filled($editing->refresh_token) ? '•••••• saved — leave blank to keep' : '1//…' }}">
+                    <small class="field-hint">OAuth 2.0 Playground with scope <code>…/auth/adwords</code>.</small>
                 </div>
             </div>
 
@@ -89,7 +104,7 @@
                     <tr>
                         <th>Account</th>
                         <th>Manager ID</th>
-                        <th>Apps</th>
+                        <th>Apps with data</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -123,7 +138,7 @@
                             @endif
                             <a href="{{ url('/connections/'.$c->id.'/edit') }}" style="color:#a78bfa;margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url('/connections/'.$c->id) }}"
-                                  onsubmit="return confirm('Remove {{ $c->name }}? Apps using it will be unlinked.')" style="display:inline">
+                                  onsubmit="return confirm({{ \Illuminate\Support\Js::from('Remove '.$c->name.'? Its synced report data will be deleted too.') }})" style="display:inline">
                                 @csrf @method('DELETE')
                                 <button type="submit" style="background:none;border:none;color:var(--red);cursor:pointer" title="Remove"><i class="bi bi-trash"></i></button>
                             </form>
@@ -139,4 +154,5 @@
         </div>
     </div>
 </div>
+@include('connections._guide')
 @endsection

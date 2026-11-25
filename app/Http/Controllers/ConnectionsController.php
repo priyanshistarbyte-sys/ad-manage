@@ -4,17 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Connection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * CRUD for Google Ads Manager (MCC) account connections. Each connection holds
- * its own API credentials; apps reference a connection.
+ * its own API credentials. Campaigns are matched to apps by App ID on sync.
  */
 class ConnectionsController extends Controller
 {
     public function index()
     {
         return view('connections.index', [
-            'connections' => Connection::withCount('apps')->orderBy('name')->get(),
+            'connections' => $this->listing(),
             'editing'     => null,
             'activePage'  => 'connections',
             'pageTitle'   => 'Ad Accounts',
@@ -24,7 +25,7 @@ class ConnectionsController extends Controller
     public function edit(Connection $connection)
     {
         return view('connections.index', [
-            'connections' => Connection::withCount('apps')->orderBy('name')->get(),
+            'connections' => $this->listing(),
             'editing'     => $connection,
             'activePage'  => 'connections',
             'pageTitle'   => 'Edit Ad Account',
@@ -73,6 +74,14 @@ class ConnectionsController extends Controller
         );
     }
 
+    /** Connections with the number of distinct tracked apps that have synced data. */
+    private function listing()
+    {
+        return Connection::withCount(['dailyStats as apps_count' => function ($q) {
+            $q->select(DB::raw('COUNT(DISTINCT app_id)'));
+        }])->orderBy('name')->get();
+    }
+
     private function validated(Request $request): array
     {
         $data = $request->validate([
@@ -91,7 +100,7 @@ class ConnectionsController extends Controller
             }
         }
 
-        $data['login_customer_id'] = preg_replace('/\D/', '', (string) $data['login_customer_id']) ?: null;
+        $data['login_customer_id'] = preg_replace('/\D/', '', (string) ($data['login_customer_id'] ?? '')) ?: null;
 
         return $data;
     }

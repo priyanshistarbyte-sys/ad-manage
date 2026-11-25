@@ -18,9 +18,9 @@ class Connection extends Model
         'active' => 'boolean',
     ];
 
-    public function apps(): HasMany
+    public function dailyStats(): HasMany
     {
-        return $this->hasMany(App::class);
+        return $this->hasMany(DailyStat::class);
     }
 
     /** True once the core credentials needed to call the API are present. */

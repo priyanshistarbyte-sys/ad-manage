@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An Android app tracked in the panel — just a name + its store App ID
@@ -20,9 +19,4 @@ class App extends Model
     protected $casts = [
         'active' => 'boolean',
     ];
-
-    public function connection(): BelongsTo
-    {
-        return $this->belongsTo(Connection::class);
-    }
 }

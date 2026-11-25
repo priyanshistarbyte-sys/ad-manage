@@ -21,7 +21,9 @@
             <a href="{{ url('/') }}"           class="nav-btn {{ $active==='home'        ? 'active':'' }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
             <a href="{{ url('/report') }}"     class="nav-btn {{ $active==='report'      ? 'active':'' }}"><i class="bi bi-table"></i> Report</a>
             <a href="{{ url('/apps') }}"       class="nav-btn {{ $active==='apps'        ? 'active':'' }}"><i class="bi bi-grid-3x3-gap"></i> Apps</a>
+            @if (isAdmin())
             <a href="{{ url('/connections') }}" class="nav-btn {{ $active==='connections' ? 'active':'' }}"><i class="bi bi-google"></i> Ad Accounts</a>
+            @endif
             <a href="{{ url('/sync-all') }}"   class="nav-btn {{ $active==='sync-all'    ? 'active':'' }}"><i class="bi bi-arrow-repeat"></i> Sync All</a>
         </div>
         <div class="d-flex align-items-center gap-3">
@@ -31,9 +33,12 @@
                 {{ currentUserName() }}@if (isAdmin()) <span style="color:#a78bfa">(admin)</span>@endif
             </span>
             @endif
-            <a href="{{ url('/logout') }}" class="btn-primary-custom" style="text-decoration:none">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
+            <form method="post" action="{{ url('/logout') }}" style="margin:0">
+                @csrf
+                <button type="submit" class="btn-primary-custom">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
         </div>
     </div>
 </nav>
@@ -54,7 +59,6 @@
     @yield('content')
 </main>
 
-<script src="{{ asset('assets/js/app.js') }}"></script>
 @yield('scripts')
 </body>
 </html>

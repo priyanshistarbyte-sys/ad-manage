@@ -49,11 +49,13 @@
     @endif
 
     {{-- Debug panel: full per-account sync response (Step: debugging Sync All) --}}
-    @if (session('sync_debug'))
-    @php $dbg = session('sync_debug'); @endphp
+    @if ($lastRun)
+    @php $dbg = $lastRun; @endphp
     <div class="data-card" style="margin-bottom:18px;border-color:#a78bfa55">
         <div class="data-card-header">
-            <span><i class="bi bi-bug"></i> Sync Debug — last run</span>
+            <span><i class="bi bi-bug"></i> Sync Debug — last run
+                @if (!empty($dbg['finished_at']))<span style="color:var(--text-muted);font-weight:400;font-size:12px">({{ \Carbon\Carbon::parse($dbg['finished_at'])->diffForHumans() }})</span>@endif
+            </span>
             <span style="color:var(--text-muted);font-size:12px">
                 {{ $dbg['range'] }} · {{ $dbg['accounts'] }} account(s) · {{ $dbg['campaigns'] }} campaign(s) · {{ $dbg['daily'] }} daily row(s)
             </span>

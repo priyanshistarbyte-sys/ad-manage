@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\App;
 use App\Models\CampaignStat;
 use App\Models\Connection;
 use App\Services\GoogleAdsService;
@@ -21,8 +20,8 @@ class SyncAllController extends Controller
             'pageTitle'    => 'Sync All',
             'grouped'      => $stats,
             'connections'  => Connection::where('active', true)->get(),
-            'apps'         => App::with('connection')->orderBy('name')->get(),
             'lastSynced'   => CampaignStat::max('synced_at'),
+            'lastRun'      => json_decode(getSetting('last_sync_result'), true) ?: null,
             'periodStart'  => Carbon::now()->startOfMonth()->toDateString(),
             'periodEnd'    => Carbon::now()->toDateString(),
         ]);
@@ -53,18 +52,6 @@ class SyncAllController extends Controller
         if (empty($r['campaigns']) && empty($r['daily']) && empty($r['errors'])) {
             $back->with('flash', 'Sync finished — no campaigns found for this month.');
         }
-
-        // Full per-account debug trail for the panel (kept in the session flash
-        // so it survives the redirect back to the Sync All page).
-        $back->with('sync_debug', [
-            'range'     => "{$start} → {$end}",
-            'campaigns' => $r['campaigns'] ?? 0,
-            'daily'     => $r['daily'] ?? 0,
-            'accounts'  => $r['accounts'] ?? 0,
-            'discovery' => $r['debug_discovery'] ?? [],
-            'accounts_detail' => $r['debug'] ?? [],
-            'errors'    => array_values(array_unique($r['errors'] ?? [])),
-        ]);
 
         return $back;
     }

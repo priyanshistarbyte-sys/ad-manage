@@ -87,7 +87,7 @@
                         <td style="text-align:right;white-space:nowrap">
                             <a href="{{ url('/apps/'.$app->id.'/edit') }}" style="color:#a78bfa;margin-right:12px" title="Edit"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url('/apps/'.$app->id) }}"
-                                  onsubmit="return confirm('Remove {{ $app->name }}?')" style="display:inline">
+                                  onsubmit="return confirm({{ \Illuminate\Support\Js::from('Remove '.$app->name.'?') }})" style="display:inline">
                                 @csrf @method('DELETE')
                                 <button type="submit" style="background:none;border:none;color:var(--red);cursor:pointer" title="Remove"><i class="bi bi-trash"></i></button>
                             </form>

@@ -15,13 +15,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.pin' => \App\Http\Middleware\EnsureAuthenticated::class,
             'admin'    => \App\Http\Middleware\EnsureAdmin::class,
         ]);
-
-        // PIN auth guards every POST endpoint; the login form itself posts
-        // before a session exists, so exempt it from CSRF (matches the port).
-        $middleware->validateCsrfTokens(except: [
-            'login',
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // An expired CSRF token (login page left open past the session
+        // lifetime) sends the user back to a fresh login form instead of a 419.
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            if ($e->getStatusCode() === 419 && $request->is('login', 'logout')) {
+                return redirect('/login');
+            }
+        });
     })->create();

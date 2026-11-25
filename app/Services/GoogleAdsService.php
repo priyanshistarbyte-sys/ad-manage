@@ -7,6 +7,7 @@ use App\Models\CampaignStat;
 use App\Models\Connection;
 use App\Models\Country;
 use App\Models\DailyStat;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -50,10 +51,6 @@ class GoogleAdsService
     }
 
     /**
-     * Sync every active, configured connection for [$start, $end].
-     * Returns ['campaigns' => int, 'accounts' => int, 'errors' => string[]].
-     */
-    /**
      * Test a single connection's credentials: sign in, then list accessible
      * accounts. Returns ['ok' => bool, 'message' => string, 'accounts' => int].
      */
@@ -72,14 +69,51 @@ class GoogleAdsService
         }
     }
 
+    /**
+     * Sync every active, configured connection for [$start, $end].
+     * Returns ['campaigns', 'accounts', 'daily', 'errors', 'debug', 'debug_discovery'].
+     */
     public function syncAll(string $start, string $end): array
     {
         $summary = ['campaigns' => 0, 'accounts' => 0, 'daily' => 0, 'errors' => [],
                     'debug' => [], 'debug_discovery' => []];
 
-        // Many accessible accounts = many API calls; don't let PHP time out mid-sync.
+        // Many accessible accounts = many API calls; don't let PHP time out
+        // mid-sync, and keep going even if the browser / proxy gives up waiting.
         @set_time_limit(600);
+        @ignore_user_abort(true);
 
+        // One sync at a time (button + nightly cron could otherwise overlap).
+        $lock = Cache::lock('ads-sync-all', 1800);
+        if (!$lock->get()) {
+            $summary['errors'][] = 'Another sync is already running — try again in a few minutes.';
+            return $summary;
+        }
+
+        try {
+            $this->runSync($start, $end, $summary);
+        } finally {
+            $lock->release();
+        }
+
+        // Persist the outcome so the Sync All page can show it even when the
+        // HTTP request itself timed out before the redirect.
+        setSetting('last_sync_result', json_encode([
+            'range'           => "{$start} → {$end}",
+            'finished_at'     => now()->toIso8601String(),
+            'campaigns'       => $summary['campaigns'],
+            'daily'           => $summary['daily'],
+            'accounts'        => $summary['accounts'],
+            'discovery'       => $summary['debug_discovery'],
+            'accounts_detail' => $summary['debug'],
+            'errors'          => array_values(array_unique($summary['errors'])),
+        ]));
+
+        return $summary;
+    }
+
+    private function runSync(string $start, string $end, array &$summary): void
+    {
         $this->countriesSynced = false;
         $this->appByPackage = null;
 
@@ -88,7 +122,7 @@ class GoogleAdsService
 
         if ($connections->isEmpty()) {
             $summary['errors'][] = 'No configured Ad Accounts. Add credentials on the Ad Accounts page first.';
-            return $summary;
+            return;
         }
 
         foreach ($connections as $conn) {
@@ -99,7 +133,19 @@ class GoogleAdsService
             }
         }
 
-        return $summary;
+        $this->pruneHistory();
+    }
+
+    /** Drop history snapshots past the configured retention window. */
+    public function pruneHistory(): int
+    {
+        $days = (int) config('revenue.history_retention_days', 90);
+        if ($days <= 0) {
+            return 0;
+        }
+        return DB::table('daily_stat_history')
+            ->where('captured_at', '<', now()->subDays($days))
+            ->delete();
     }
 
     private function syncConnection(Connection $conn, string $start, string $end, array &$summary): void

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public ──
 Route::match(['get', 'post'], '/login', [AuthController::class, 'login'])->name('login');
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::match(['get', 'post'], '/setup', [SetupController::class, 'run'])->name('setup');
 
 // ── Authenticated ──
@@ -35,11 +35,14 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/sync-all', [SyncAllController::class, 'index'])->name('sync-all');
     Route::post('/sync-all', [SyncAllController::class, 'run'])->name('sync-all.run');
 
-    // Ad Accounts — Google Ads Manager connections (per-MCC credentials)
-    Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');
-    Route::post('/connections', [ConnectionsController::class, 'store'])->name('connections.store');
-    Route::post('/connections/{connection}/test', [ConnectionsController::class, 'test'])->name('connections.test');
-    Route::get('/connections/{connection}/edit', [ConnectionsController::class, 'edit'])->name('connections.edit');
-    Route::put('/connections/{connection}', [ConnectionsController::class, 'update'])->name('connections.update');
-    Route::delete('/connections/{connection}', [ConnectionsController::class, 'destroy'])->name('connections.destroy');
+    // Ad Accounts — Google Ads Manager connections (per-MCC credentials).
+    // Admin-only: these hold the API secrets.
+    Route::middleware('admin')->group(function () {
+        Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');
+        Route::post('/connections', [ConnectionsController::class, 'store'])->name('connections.store');
+        Route::post('/connections/{connection}/test', [ConnectionsController::class, 'test'])->name('connections.test');
+        Route::get('/connections/{connection}/edit', [ConnectionsController::class, 'edit'])->name('connections.edit');
+        Route::put('/connections/{connection}', [ConnectionsController::class, 'update'])->name('connections.update');
+        Route::delete('/connections/{connection}', [ConnectionsController::class, 'destroy'])->name('connections.destroy');
+    });
 });

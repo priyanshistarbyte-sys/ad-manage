@@ -47,11 +47,13 @@ function getSetting(string $key, string $default = ''): string
 
 function setSetting(string $key, ?string $value): void
 {
-    getDB()->prepare(
-        "INSERT INTO settings (setting_key, setting_value, created_at, updated_at)
-         VALUES (?, ?, NOW(), NOW())
-         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()"
-    )->execute([$key, $value]);
+    // Query-builder upsert works on MySQL, MariaDB, SQLite and Postgres.
+    $now = now();
+    DB::table('settings')->upsert(
+        [['setting_key' => $key, 'setting_value' => $value, 'created_at' => $now, 'updated_at' => $now]],
+        ['setting_key'],
+        ['setting_value', 'updated_at']
+    );
 }
 
 // ── Users / PIN auth ────────────────────────────────────────────────
@@ -128,8 +130,9 @@ function setSecondPin(int $userId, ?string $pin): void
 function createUser(string $name, string $pin, bool $isAdmin = false): int
 {
     $pdo = getDB();
-    $pdo->prepare("INSERT INTO users (name, pin_hash, is_admin, active, created_at, updated_at) VALUES (?,?,?,1,NOW(),NOW())")
-        ->execute([$name, password_hash($pin, PASSWORD_BCRYPT), $isAdmin ? 1 : 0]);
+    $now = now()->toDateTimeString();
+    $pdo->prepare("INSERT INTO users (name, pin_hash, is_admin, active, created_at, updated_at) VALUES (?,?,?,1,?,?)")
+        ->execute([$name, password_hash($pin, PASSWORD_BCRYPT), $isAdmin ? 1 : 0, $now, $now]);
     return (int) $pdo->lastInsertId();
 }
 

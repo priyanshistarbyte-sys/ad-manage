@@ -14,17 +14,13 @@ class AuthController extends Controller
     const AUTH_LOCKOUT_SECONDS = 60;
     const PIN2_PENDING_TTL     = 300;  // seconds allowed to complete step 2
 
-    public function show(Request $request)
-    {
-        // Already signed in? go home.
-        if (hasUsers() && isAuthenticated()) {
-            return redirect('/');
-        }
-        return $this->render($request, null);
-    }
-
     public function login(Request $request)
     {
+        // Already signed in? go home.
+        if ($request->isMethod('get') && hasUsers() && isAuthenticated()) {
+            return redirect('/');
+        }
+
         if (session('login_fails') === null)      session(['login_fails' => 0]);
         if (session('login_lock_until') === null) session(['login_lock_until' => 0]);
 
@@ -112,9 +108,10 @@ class AuthController extends Controller
         return $this->render($request, $error, $pendingUser, $mode, $lockSecondsLeft);
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         authLogout();
+        $request->session()->regenerateToken();
         return redirect('/login');
     }
 
