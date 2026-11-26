@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AppsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConnectionsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SyncAllController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +26,11 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/report/history', [ReportController::class, 'history'])->name('report.history');
     Route::get('/report/export', [ReportController::class, 'export'])->name('report.export');
 
+    // Analytics — loss-making countries per app (selected date / 30d / 90d)
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
+    Route::get('/analytics/notes', [AnalyticsController::class, 'notes'])->name('analytics.notes');
+    Route::post('/analytics/notes', [AnalyticsController::class, 'storeNote'])->name('analytics.notes.store');
+
     // Apps management (add / edit / delete)
     Route::get('/apps', [AppsController::class, 'index'])->name('apps');
     Route::post('/apps', [AppsController::class, 'store'])->name('apps.store');
@@ -35,12 +42,18 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/sync-all', [SyncAllController::class, 'index'])->name('sync-all');
     Route::post('/sync-all', [SyncAllController::class, 'run'])->name('sync-all.run');
 
+    // Settings — app-wide preferences (history view window, …)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
+
     // Ad Accounts — Google Ads Manager connections (per-MCC credentials).
     // Admin-only: these hold the API secrets.
     Route::middleware('admin')->group(function () {
         Route::get('/connections', [ConnectionsController::class, 'index'])->name('connections');
         Route::post('/connections', [ConnectionsController::class, 'store'])->name('connections.store');
         Route::post('/connections/{connection}/test', [ConnectionsController::class, 'test'])->name('connections.test');
+        Route::post('/connections/{connection}/sync', [ConnectionsController::class, 'sync'])->name('connections.sync');
         Route::get('/connections/{connection}/edit', [ConnectionsController::class, 'edit'])->name('connections.edit');
         Route::put('/connections/{connection}', [ConnectionsController::class, 'update'])->name('connections.update');
         Route::delete('/connections/{connection}', [ConnectionsController::class, 'destroy'])->name('connections.destroy');

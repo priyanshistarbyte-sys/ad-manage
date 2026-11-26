@@ -7,6 +7,7 @@ use App\Models\CampaignStat;
 use App\Models\Connection;
 use App\Models\Country;
 use App\Models\DailyStat;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -59,12 +60,14 @@ class GoogleAdsService
         try {
             $token    = $this->accessToken($conn);
             $accounts = $this->listAccessibleCustomers($token, $conn->developer_token);
+            $conn->recordSignin(true);
             return [
                 'ok'       => true,
                 'accounts' => count($accounts),
                 'message'  => 'Signed in OK · ' . count($accounts) . ' accessible account(s).',
             ];
         } catch (\Throwable $e) {
+            $conn->recordSignin(false, $e->getMessage());
             return ['ok' => false, 'accounts' => 0, 'message' => $e->getMessage()];
         }
     }
@@ -76,6 +79,7 @@ class GoogleAdsService
     public function syncAll(string $start, string $end): array
     {
         $summary = ['campaigns' => 0, 'accounts' => 0, 'daily' => 0, 'errors' => [],
+                    'probe_campaigns' => 0, 'skipped_untracked' => 0, 'tracked_accounts' => 0,
                     'debug' => [], 'debug_discovery' => []];
 
         // Many accessible accounts = many API calls; don't let PHP time out
@@ -148,9 +152,57 @@ class GoogleAdsService
             ->delete();
     }
 
+    /**
+     * Sync a SINGLE ad account (connection) for [$start, $end] — same per-account
+     * flow as Sync All, just scoped to one connection. Returns the same summary
+     * shape as syncAll().
+     */
+    public function syncOne(Connection $conn, string $start, string $end): array
+    {
+        $summary = ['campaigns' => 0, 'accounts' => 0, 'daily' => 0, 'errors' => [],
+                    'probe_campaigns' => 0, 'skipped_untracked' => 0, 'tracked_accounts' => 0,
+                    'debug' => [], 'debug_discovery' => []];
+
+        @set_time_limit(600);
+        @ignore_user_abort(true);
+        $this->countriesSynced = false;
+        $this->appByPackage = null;
+
+        if (!$conn->isConfigured()) {
+            $summary['errors'][] = 'This ad account has incomplete credentials.';
+            return $summary;
+        }
+
+        // Shares the Sync All lock so a single-account sync can't overlap a full one.
+        $lock = Cache::lock('ads-sync-all', 1800);
+        if (!$lock->get()) {
+            $summary['errors'][] = 'Another sync is already running — try again in a few minutes.';
+            return $summary;
+        }
+
+        try {
+            $this->syncConnection($conn, $start, $end, $summary);
+        } catch (\Throwable $e) {
+            $summary['errors'][] = "{$conn->name}: " . $e->getMessage();
+        } finally {
+            $lock->release();
+        }
+
+        return $summary;
+    }
+
     private function syncConnection(Connection $conn, string $start, string $end, array &$summary): void
     {
-        $token   = $this->accessToken($conn);
+        // Sign in first and record the outcome so the Ad Accounts page can flag an
+        // expired/revoked token with a "Reconnect" badge (see Connection::recordSignin).
+        try {
+            $token = $this->accessToken($conn);
+        } catch (\Throwable $e) {
+            $conn->recordSignin(false, $e->getMessage());
+            throw $e;
+        }
+        $conn->recordSignin(true);
+
         $devToken = $conn->developer_token;
 
         // 1. Accounts the credentials can access.
@@ -177,19 +229,47 @@ class GoogleAdsService
         $targets       = [];   // customerId => ['login' => managerId, 'name' => ?]
         $foundManagers = [];
         $managerIds    = [];   // every manager id seen — excluded from metric queries
+
+        // Probe every candidate as a manager CONCURRENTLY: list the client accounts
+        // each one manages. A candidate that isn't a usable login-customer-id just
+        // errors and is skipped. (Replaces the old one-at-a-time expandLeafAccounts
+        // loop — the main source of slowness on many-account logins.)
+        $clientQuery = "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager
+                        FROM customer_client
+                        WHERE customer_client.status = 'ENABLED'";
+        $discoveryReqs = [];
         foreach ($candidates as $m) {
-            // Already covered as a client of a discovered manager — skip the probe.
-            if (isset($targets[$m]) && $targets[$m]['login'] !== $m) {
-                continue;
-            }
-            try {
-                $clients = $this->expandLeafAccounts($token, $devToken, $m, $managerIds);
-            } catch (\Throwable $e) {
+            $discoveryReqs[$m] = ['login' => $m, 'customer' => $m, 'query' => $clientQuery];
+        }
+
+        foreach ($this->searchStreamPool($token, $devToken, $discoveryReqs) as $m => $rows) {
+            if (!is_array($rows) || isset($rows['__error'])) {
                 continue; // not usable as a login-customer-id (client account / no access)
             }
-            $foundManagers[] = $m;
-            foreach ($clients as $leaf) {
-                $targets[$leaf['id']] = ['login' => $m, 'name' => $leaf['name']];
+
+            $managesOthers = false;
+            $leaves        = [];
+            foreach ($rows as $r) {
+                $id = preg_replace('/\D/', '', (string) data_get($r, 'customerClient.id'));
+                if ($id === '' || $id === (string) $m) {
+                    continue; // ignore the self-row
+                }
+                $managesOthers = true; // it lists another account → it is a manager
+                if (data_get($r, 'customerClient.manager') === true) {
+                    $managerIds[$id] = true; // sub-manager — no queryable metrics
+                    continue;
+                }
+                $leaves[$id] = data_get($r, 'customerClient.descriptiveName');
+            }
+
+            // Only a real manager (one that lists other accounts) contributes
+            // targets and gets cached / flagged as a manager id.
+            if ($managesOthers) {
+                $managerIds[$m]  = true;
+                $foundManagers[] = $m;
+                foreach ($leaves as $id => $name) {
+                    $targets[$id] = ['login' => (string) $m, 'name' => $name];
+                }
             }
             // NB: the manager itself is NOT added as a target — manager accounts
             // have no metrics (REQUESTED_METRICS_FOR_MANAGER), only their clients do.
@@ -222,8 +302,21 @@ class GoogleAdsService
             'target_ids'      => array_keys($targets),
         ];
 
-        // 3. Pull campaigns per account — one failing account (permissions, etc.)
-        //    must NOT abort the rest of the sync.
+        // 3a. Cheap probe of EVERY target account CONCURRENTLY: attributes-only
+        //     campaign→package map (no metrics, no date). This is how we detect
+        //     which accounts hold a tracked App without paying for heavy queries,
+        //     and running them in parallel is the main speedup for many-account
+        //     logins (previously one sequential probe per account).
+        $probeQuery = "SELECT campaign.id, campaign.app_campaign_setting.app_id
+                       FROM campaign";
+        $probeReqs = [];
+        foreach ($targets as $customerId => $meta) {
+            $probeReqs[$customerId] = ['login' => $meta['login'], 'customer' => $customerId, 'query' => $probeQuery];
+        }
+        $probeResults = $this->searchStreamPool($token, $devToken, $probeReqs);
+
+        // 3b. Work out which accounts are worth fetching (have a tracked App).
+        $trackedByAccount = [];   // customerId => [tracked campaign ids]
         foreach ($targets as $customerId => $meta) {
             $summary['accounts']++;
             $dbg = [
@@ -235,14 +328,65 @@ class GoogleAdsService
                 'status'      => 'ok',
                 'error'       => null,
             ];
-            $dailyBefore = $summary['daily'] ?? 0;
+
+            $rows = $probeResults[$customerId] ?? ['__error' => 'no response'];
+            if (!is_array($rows) || isset($rows['__error'])) {
+                $dbg['status'] = 'skipped';
+                $dbg['error']  = is_array($rows) ? ($rows['__error'] ?? 'probe failed') : 'probe failed';
+                $summary['errors'][] = "acct {$customerId}: " . $dbg['error'];
+                $summary['debug'][] = $dbg;
+                continue;
+            }
+
+            $appMap    = [];   // campaign_id => store App ID (app campaigns only)
+            $campaigns = 0;    // total campaigns seen in this account (any type)
+            foreach ($rows as $r) {
+                $id    = (string) data_get($r, 'campaign.id');
+                if ($id === '') continue;
+                $campaigns++;
+                $appId = data_get($r, 'campaign.appCampaignSetting.appId');
+                if (!empty($appId)) {
+                    $appMap[$id] = $appId;
+                }
+            }
+            $summary['probe_campaigns'] += $campaigns;
+
+            $tracked = array_values(array_filter(
+                array_keys($appMap),
+                fn ($cid) => $this->resolveAppId($cid, $appMap) !== null
+            ));
+
+            // No tracked apps here → skip entirely (no campaign_stats, no geo).
+            if (empty($tracked)) {
+                $dbg['status'] = 'no-tracked-apps';
+                // Distinguish "account has app campaigns but none match a tracked
+                // App" from "no app campaigns at all" — the former means the App
+                // ID on the Apps page doesn't match the campaign's target package.
+                if (!empty($appMap)) {
+                    $summary['skipped_untracked']++;
+                }
+                $summary['debug'][] = $dbg;
+                continue;
+            }
+
+            $summary['tracked_accounts']++;
+            $trackedByAccount[$customerId] = ['tracked' => $tracked, 'appMap' => $appMap, 'meta' => $meta, 'dbg' => $dbg];
+        }
+
+        // 3c. Pull metrics + daily/geo for the tracked accounts only — one failing
+        //     account (permissions, etc.) must NOT abort the rest of the sync.
+        foreach ($trackedByAccount as $customerId => $info) {
+            $meta               = $info['meta'];
+            $dbg                = $info['dbg'];
+            $trackedCampaignIds = $info['tracked'];
+            $this->campaignAppMap = $info['appMap'];
+            $dailyBefore        = $summary['daily'] ?? 0;
 
             // Give each account its own time budget so a large (but steadily
-            // progressing) multi-account sync can't trip the max-execution-time
-            // fatal mid-way. Resets the counter on each iteration.
+            // progressing) sync can't trip the max-execution-time fatal mid-way.
             @set_time_limit(120);
 
-            // Refresh the country map once from the first reachable account.
+            // Refresh the country map once from the first tracked account.
             if (!$this->countriesSynced) {
                 try {
                     $this->syncCountries($token, $devToken, $meta['login'], $customerId);
@@ -252,8 +396,9 @@ class GoogleAdsService
                 }
             }
 
+            // Metric totals for the tracked campaigns only → campaign_stats.
             try {
-                $campaigns = $this->fetchCampaigns($token, $devToken, $meta['login'], $customerId, $start, $end);
+                $campaigns = $this->fetchCampaigns($token, $devToken, $meta['login'], $customerId, $start, $end, $trackedCampaignIds);
             } catch (\Throwable $e) {
                 $summary['errors'][] = "acct {$customerId}: " . $e->getMessage();
                 $dbg['status'] = 'skipped';
@@ -262,18 +407,10 @@ class GoogleAdsService
                 continue;
             }
 
-            // Map this account's campaigns to their target store App ID so the
-            // daily rows can be attached to the matching tracked App by package.
-            $this->campaignAppMap = [];
-            foreach ($campaigns as $c) {
-                if (!empty($c['app_id'])) {
-                    $this->campaignAppMap[$c['id']] = $c['app_id'];
-                }
-            }
-
-            // Daily / per-country / bucketed rows for the Excel-style report.
+            // Daily / per-country / bucketed rows for the Excel-style report,
+            // restricted to the tracked campaigns.
             try {
-                $daily = $this->fetchDailyGeoStats($token, $devToken, $meta['login'], $customerId, $start, $end);
+                $daily = $this->fetchDailyGeoStats($token, $devToken, $meta['login'], $customerId, $start, $end, $trackedCampaignIds);
                 $this->persistDailyStats($conn, $customerId, $meta['name'], $daily, $summary);
             } catch (\Throwable $e) {
                 $summary['errors'][] = "acct {$customerId} (daily): " . $e->getMessage();
@@ -284,11 +421,6 @@ class GoogleAdsService
             $dbg['daily'] = ($summary['daily'] ?? 0) - $dailyBefore;
 
             foreach ($campaigns as $c) {
-                // Skip campaigns that don't promote a tracked App (matched by App ID).
-                if ($this->resolveAppId($c['id']) === null) {
-                    continue;
-                }
-
                 CampaignStat::updateOrCreate(
                     ['connection_id' => $conn->id, 'customer_id' => $customerId, 'campaign_id' => $c['id']],
                     [
@@ -322,12 +454,17 @@ class GoogleAdsService
      *
      * @return array<string,array> keyed by "campaignId|date|geoId"
      */
-    private function fetchDailyGeoStats(string $token, string $devToken, string $loginId, string $customerId, string $start, string $end, ?string $campaignId = null): array
+    private function fetchDailyGeoStats(string $token, string $devToken, string $loginId, string $customerId, string $start, string $end, array $campaignIds = []): array
     {
         $rows = [];
 
-        // Optional single-campaign filter (targeted per-app sync).
-        $campaignFilter = $campaignId ? " AND campaign.id = {$campaignId}" : '';
+        // Restrict to the given campaigns (tracked apps only). With no ids we'd
+        // fetch the whole account, so an empty list means "nothing to pull".
+        if (empty($campaignIds)) {
+            return $rows;
+        }
+        $idList = implode(', ', array_map(fn ($id) => (int) $id, $campaignIds));
+        $campaignFilter = " AND campaign.id IN ({$idList})";
 
         // 1. Base spend/engagement per campaign × date × country.
         $baseQuery = "SELECT campaign.id, campaign.name,
@@ -417,14 +554,11 @@ class GoogleAdsService
         $history = [];
 
         foreach ($rows as $row) {
-            $appId = $this->resolveAppId($row['campaign_id']);
-
-            // Only store data for campaigns that belong to a tracked App (matched
-            // by App ID). Everything else from the account is ignored.
-            if ($appId === null) {
-                continue;
-            }
-
+            // Store everything the account returns; app_id is set when the campaign's
+            // App ID matches a tracked App, and left null otherwise. The report only
+            // *displays* tracked apps (app_id not null), so untracked data is kept but
+            // hidden until a matching App is added.
+            $appId    = $this->resolveAppId($row['campaign_id']);
             $totalRev = $row['ad_rev'] + $row['convert_rev'] + $row['renew_rev'];
 
             $daily[] = [
@@ -460,6 +594,7 @@ class GoogleAdsService
                 'geo_id'        => $row['geo_id'],
                 'date'          => $row['date'],
                 'cost'          => $row['cost'],
+                'conversions_value' => $row['conversions_value'],
                 'install'       => $row['install'],
                 'trial'         => $row['trial'],
                 'trial_convert' => $row['trial_convert'],
@@ -495,9 +630,10 @@ class GoogleAdsService
      * (campaign.app_campaign_setting.app_id) matched to apps.package_id. Returns
      * null for campaigns with no app target or no matching tracked App.
      */
-    private function resolveAppId(string $campaignId): ?int
+    private function resolveAppId(string $campaignId, ?array $map = null): ?int
     {
-        $storeAppId = $this->campaignAppMap[$campaignId] ?? null;
+        $map ??= $this->campaignAppMap;
+        $storeAppId = $map[$campaignId] ?? null;
         if ($storeAppId === null) {
             return null;
         }
@@ -604,53 +740,14 @@ class GoogleAdsService
         );
     }
 
-    /**
-     * Expand a (possibly manager) account into its non-manager client accounts.
-     * Manager account ids found (including the account itself when it is a
-     * manager) are collected into $managerIds — metrics can't be queried on a
-     * manager, so callers must exclude them from the query targets.
-     */
-    private function expandLeafAccounts(string $token, string $devToken, string $managerId, array &$managerIds = []): array
+    private function fetchCampaigns(string $token, string $devToken, string $loginId, string $customerId, string $start, string $end, array $campaignIds = []): array
     {
-        $query = "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager
-                  FROM customer_client
-                  WHERE customer_client.status = 'ENABLED'";
-
-        $rows = $this->searchStream($token, $devToken, $managerId, $managerId, $query);
-
-        $leaves        = [];
-        $managesOthers = false;
-        foreach ($rows as $r) {
-            $id = preg_replace('/\D/', '', (string) data_get($r, 'customerClient.id'));
-            if ($id === '') {
-                continue;
-            }
-            // The self-row (the queried account) is ignored — whether it is a
-            // manager is decided below by whether it lists any other account.
-            if ($id === $managerId) {
-                continue;
-            }
-            $managesOthers = true; // it lists another account → it is a manager
-            if (data_get($r, 'customerClient.manager') === true) {
-                $managerIds[$id] = true; // sub-manager — no queryable metrics
-                continue;
-            }
-            $leaves[] = ['id' => $id, 'name' => data_get($r, 'customerClient.descriptiveName')];
+        // Restrict the metric pull to the given campaigns (tracked apps only).
+        $campaignFilter = '';
+        if (!empty($campaignIds)) {
+            $idList = implode(', ', array_map(fn ($id) => (int) $id, $campaignIds));
+            $campaignFilter = " AND campaign.id IN ({$idList})";
         }
-
-        // An account that manages other accounts is a manager itself, so its own
-        // metrics can't be queried (REQUESTED_METRICS_FOR_MANAGER). Flag it so the
-        // caller drops it from the query targets.
-        if ($managesOthers) {
-            $managerIds[$managerId] = true;
-        }
-
-        return $leaves;
-    }
-
-    private function fetchCampaigns(string $token, string $devToken, string $loginId, string $customerId, string $start, string $end, ?string $campaignId = null): array
-    {
-        $campaignFilter = $campaignId ? " AND campaign.id = {$campaignId}" : '';
 
         $query = "SELECT campaign.id, campaign.name, campaign.status,
                          campaign.advertising_channel_type,
@@ -708,6 +805,111 @@ class GoogleAdsService
             }
         }
         return $results;
+    }
+
+    /**
+     * Run many GAQL searchStream queries CONCURRENTLY (Laravel Http::pool).
+     * The big win for multi-account logins: dozens of sequential round-trips
+     * become a few parallel batches.
+     *
+     * Requests that fail with a transient error (rate limit / 5xx / connection
+     * drop) are retried with exponential backoff — running in parallel makes
+     * RESOURCE_EXHAUSTED more likely, so the retry keeps a rate-limited account
+     * from being lost to a manual re-sync. Non-retryable errors (permissions,
+     * bad query) fail immediately.
+     *
+     * @param array<string,array{login:string,customer:string,query:string}> $requests keyed by caller id
+     * @param int $concurrency  max requests in flight per batch (Google rate-limit friendly)
+     * @param int $maxAttempts  total tries per request (1 initial + retries)
+     * @return array<string,array> per key: the flat result rows, or ['__error' => message] on failure
+     */
+    private function searchStreamPool(string $token, string $devToken, array $requests, int $concurrency = 12, int $maxAttempts = 3): array
+    {
+        $out     = [];
+        $pending = $requests;   // key => req; shrinks as requests succeed / give up
+
+        for ($attempt = 1; $attempt <= $maxAttempts && !empty($pending); $attempt++) {
+            $retry    = [];
+            $lastTry  = $attempt >= $maxAttempts;
+
+            foreach (array_chunk($pending, $concurrency, true) as $chunk) {
+                $keys = array_keys($chunk);
+
+                $responses = Http::pool(function (Pool $pool) use ($token, $devToken, $chunk) {
+                    $calls = [];
+                    foreach ($chunk as $key => $req) {
+                        $headers = ['developer-token' => $devToken];
+                        $login   = preg_replace('/\D/', '', (string) $req['login']);
+                        if ($login !== '') {
+                            $headers['login-customer-id'] = $login;
+                        }
+                        $calls[] = $pool->as((string) $key)
+                            ->withToken($token)
+                            ->withHeaders($headers)
+                            ->post("{$this->base}/customers/{$req['customer']}/googleAds:searchStream", ['query' => $req['query']]);
+                    }
+                    return $calls;
+                });
+
+                foreach ($keys as $key) {
+                    $resp = $responses[(string) $key] ?? null;
+
+                    // Transport-level failure (timeout / connection reset) — transient.
+                    if ($resp instanceof \Throwable) {
+                        if ($lastTry) {
+                            $out[$key] = ['__error' => $resp->getMessage()];
+                        } else {
+                            $retry[$key] = $pending[$key];
+                        }
+                        continue;
+                    }
+
+                    if ($resp && $resp->ok()) {
+                        $rows = [];
+                        foreach ((array) $resp->json() as $batch) {
+                            foreach (($batch['results'] ?? []) as $row) {
+                                $rows[] = $row;
+                            }
+                        }
+                        $out[$key] = $rows;
+                        continue;
+                    }
+
+                    // HTTP error: retry transient ones (rate limit / 5xx), fail the rest.
+                    if ($resp && !$lastTry && $this->isRetryable($resp)) {
+                        $retry[$key] = $pending[$key];
+                        continue;
+                    }
+                    $out[$key] = ['__error' => $resp ? $this->apiError($resp) : 'no response'];
+                }
+            }
+
+            $pending = $retry;
+
+            // Exponential backoff with jitter before retrying the failed subset.
+            if (!empty($pending) && !$lastTry) {
+                $delayMs = 250 * (2 ** ($attempt - 1));           // 250ms, 500ms, 1000ms, …
+                usleep(($delayMs + random_int(0, 150)) * 1000);
+            }
+        }
+
+        return $out;
+    }
+
+    /** Whether a failed HTTP response is worth retrying (rate limit / transient). */
+    private function isRetryable($resp): bool
+    {
+        if (in_array($resp->status(), [429, 500, 502, 503, 504], true)) {
+            return true;
+        }
+
+        $body = strtoupper((string) $resp->body());
+        foreach (['RESOURCE_EXHAUSTED', 'RATE_EXCEEDED', 'RATE_LIMIT', 'DEADLINE_EXCEEDED', 'INTERNAL_ERROR'] as $needle) {
+            if (str_contains($body, $needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function apiError($resp): string

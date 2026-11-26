@@ -4,17 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Login · ad-manage</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('ad-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
 <link rel="icon" type="image/svg+xml" href="{{ asset('assets/favicon.svg') }}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}">
 <style>
   html,body{height:100%}
   body{display:flex;align-items:center;justify-content:center;background:var(--header-bg)}
-  .login-card{width:380px;background:#12122a;border:1px solid #2e2e5a;border-radius:14px;
-              padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .login-card{width:380px;background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+              padding:36px 32px;box-shadow:0 20px 60px var(--shadow-strong)}
   .otp-row{display:flex;gap:8px;justify-content:center;margin:14px 0}
   .otp-box{width:44px;height:54px;text-align:center;font-size:22px;font-weight:700;
-           background:#0d0d22;border:1px solid var(--border);border-radius:8px;color:#fff}
+           background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text-strong)}
   .otp-box:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(108,63,197,.25);outline:none}
 </style>
 </head>
@@ -23,10 +31,10 @@
     <div style="text-align:center;margin-bottom:6px">
         <i class="bi bi-graph-up-arrow" style="font-size:2rem;color:var(--purple)"></i>
     </div>
-    <h4 style="text-align:center;color:#fff;margin-bottom:4px">ad-manage</h4>
+    <h4 style="text-align:center;color:var(--text-strong);margin-bottom:4px">ad-manage</h4>
     @if ($mode === 'verify2')
     <div style="text-align:center;margin-bottom:10px">
-        <span style="background:rgba(108,63,197,.18);border:1px solid rgba(167,139,250,.4);color:#c4b5fd;
+        <span style="background:rgba(108,63,197,.18);border:1px solid rgba(167,139,250,.4);color:var(--accent-soft-hover);
                      border-radius:20px;font-size:11px;padding:3px 10px">
             <i class="bi bi-shield-lock"></i> Step 2 of 2 · {{ $pendingUser['name'] }}
         </span>
@@ -36,21 +44,21 @@
         @if ($mode === 'setup')
             Create the admin account — your name and a 6-digit PIN
         @elseif ($mode === 'verify2')
-            Enter your <strong style="color:#fff">second PIN</strong> to finish signing in
+            Enter your <strong style="color:var(--text-strong)">second PIN</strong> to finish signing in
         @else
             Enter your 6-digit PIN to continue
         @endif
     </p>
 
     @if ($error)
-    <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;
+    <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red-fg);
                 border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:14px;text-align:center">
         {{ $error }}
     </div>
     @endif
 
     @if ($lockSecondsLeft > 0 && !$error)
-    <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;
+    <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:var(--warn-fg);
                 border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:14px;text-align:center">
         Too many attempts. Try again in <span id="lockTimer">{{ $lockSecondsLeft }}</span>s.
     </div>
@@ -61,8 +69,8 @@
         @if ($mode === 'setup')
         <p style="text-align:center;color:var(--text-muted);font-size:11px;margin:0 0 4px">Your Name</p>
         <input type="text" name="name" required maxlength="100" placeholder="e.g. Parth"
-               style="width:100%;background:#0d0d22;border:1px solid var(--border);border-radius:8px;
-                      color:#fff;padding:9px 12px;font-size:13px;margin-bottom:12px"
+               style="width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;
+                      color:var(--text-strong);padding:9px 12px;font-size:13px;margin-bottom:12px"
                value="{{ old('name') }}">
         <p style="text-align:center;color:var(--text-muted);font-size:11px;margin:0 0 4px">Choose a 6-digit PIN</p>
         @endif
@@ -90,7 +98,7 @@
 
         <p style="text-align:center;color:var(--text-muted);font-size:11px;margin-top:14px">
             @if ($mode === 'verify2')
-                <a href="{{ url('/login?restart=1') }}" style="color:#a78bfa;text-decoration:none">← Start over</a>
+                <a href="{{ url('/login?restart=1') }}" style="color:var(--accent-soft);text-decoration:none">← Start over</a>
                 · Expires in {{ (int)($PIN2_PENDING_TTL / 60) }} min
             @else
                 Session stays unlocked for 3 hours.

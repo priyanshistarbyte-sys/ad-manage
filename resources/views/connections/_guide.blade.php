@@ -210,7 +210,8 @@
     }
 
     document.querySelectorAll('[data-guide-step]').forEach(btn =>
-        btn.addEventListener('click', () => { show(+btn.dataset.guideStep); dlg.showModal(); }));
+        // Open first: the step strip can only be scrolled once the dialog is laid out.
+        btn.addEventListener('click', () => { dlg.showModal(); show(+btn.dataset.guideStep); }));
     pills.forEach(b => b.addEventListener('click', () => show(+b.dataset.guideGoto)));
     prev.addEventListener('click', () => show(step - 1));
     next.addEventListener('click', () => step === total ? dlg.close() : show(step + 1));

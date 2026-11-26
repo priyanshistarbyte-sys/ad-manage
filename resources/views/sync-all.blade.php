@@ -13,7 +13,7 @@
     <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
                 background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px">
         <div>
-            <h5 style="color:#fff;margin:0"><i class="bi bi-arrow-repeat" style="color:var(--purple)"></i> Sync All Campaigns</h5>
+            <h5 style="color:var(--text-strong);margin:0"><i class="bi bi-arrow-repeat" style="color:var(--purple)"></i> Sync All Campaigns</h5>
             <p style="color:var(--text-muted);font-size:12.5px;margin:6px 0 0">
                 Pulls <strong>every campaign</strong> from every account your Ad Account credentials can access,
                 for <strong>this month</strong> ({{ \Carbon\Carbon::parse($periodStart)->format('d M') }} → {{ \Carbon\Carbon::parse($periodEnd)->format('d M Y') }}).
@@ -24,101 +24,93 @@
         </div>
         <form method="post" action="{{ url('/sync-all') }}">
             @csrf
-            <button type="submit" class="btn-primary-custom" style="background:#1a7f37;font-size:14px;padding:10px 20px"
+            <button type="submit" class="btn-primary-custom" style="background:var(--btn-green);font-size:14px;padding:10px 20px"
                     onclick="this.innerHTML='<i class=\'bi bi-hourglass-split\'></i> Syncing…';this.disabled=true;this.form.submit();">
                 <i class="bi bi-arrow-repeat"></i> Sync All Now
             </button>
         </form>
     </div>
 
-    <div style="background:rgba(167,139,250,.06);border:1px solid #a78bfa33;border-radius:10px;
+    <div style="background:rgba(167,139,250,.06);border:1px solid var(--border-strong);border-radius:10px;
                 padding:12px 18px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px">
-        <i class="bi bi-info-circle" style="color:#a78bfa"></i>
-        Synced campaigns are matched to your apps automatically by <strong style="color:#fff">App ID</strong>
-        (the campaign's target Play package). Add apps on the
-        <a href="{{ url('/apps') }}" style="color:#a78bfa">Apps</a> page — no customer or campaign IDs needed.
+        <i class="bi bi-info-circle" style="color:var(--accent-soft)"></i>
+        Synced campaigns are matched to your apps automatically by <strong style="color:var(--text-strong)">App ID</strong>.
+        Add an app with just its <strong style="color:var(--text-strong)">App name</strong> and <strong style="color:var(--text-strong)">App ID</strong>
+        on the <a href="{{ url('/apps') }}" style="color:var(--accent-soft)">Apps</a> page.
     </div>
 
-    @if ($connections->isEmpty())
-    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fbbf24;
-                border-radius:8px;padding:12px 18px;font-size:13px;margin-bottom:18px">
-        <i class="bi bi-exclamation-triangle"></i>
-        No Ad Accounts yet. Add one with credentials on the
-        <a href="{{ url('/connections') }}" style="color:#fcd34d">Ad Accounts</a> page first.
-    </div>
-    @endif
-
-    {{-- Debug panel: full per-account sync response (Step: debugging Sync All) --}}
-    @if ($lastRun)
-    @php $dbg = $lastRun; @endphp
-    <div class="data-card" style="margin-bottom:18px;border-color:#a78bfa55">
-        <div class="data-card-header">
-            <span><i class="bi bi-bug"></i> Sync Debug — last run
-                @if (!empty($dbg['finished_at']))<span style="color:var(--text-muted);font-weight:400;font-size:12px">({{ \Carbon\Carbon::parse($dbg['finished_at'])->diffForHumans() }})</span>@endif
-            </span>
-            <span style="color:var(--text-muted);font-size:12px">
-                {{ $dbg['range'] }} · {{ $dbg['accounts'] }} account(s) · {{ $dbg['campaigns'] }} campaign(s) · {{ $dbg['daily'] }} daily row(s)
-            </span>
-        </div>
-
-        {{-- Discovery: what the credentials could reach --}}
-        @foreach ($dbg['discovery'] as $d)
-        <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted)">
-            <strong style="color:#fff">{{ $d['connection'] }}</strong> —
-            directly accessible: <span style="color:#a78bfa">{{ count($d['accessible']) }}</span>
-            ({{ implode(', ', $d['accessible']) ?: '—' }}) ·
-            managers found: <span style="color:#a78bfa">{{ count($d['found_managers']) }}</span>
-            ({{ implode(', ', $d['found_managers']) ?: '—' }}) ·
-            total targets queried: <span style="color:#fff">{{ $d['target_count'] }}</span>
-        </div>
-        @endforeach
-
-        {{-- Per-account outcome --}}
-        <div class="table-wrap">
-            <table class="ledger" style="width:100%;white-space:nowrap;font-size:12px">
-                <thead>
-                    <tr><th>Customer ID</th><th>Login used</th><th>Name</th><th>Campaigns</th><th>Daily rows</th><th>Status</th><th>Error</th></tr>
-                </thead>
-                <tbody>
-                    @forelse ($dbg['accounts_detail'] as $a)
-                    <tr>
-                        <td style="text-align:left;font-family:monospace">{{ $a['customer_id'] }}</td>
-                        <td style="text-align:left;font-family:monospace">{{ $a['login'] }}</td>
-                        <td style="text-align:left">{{ $a['name'] ?: '—' }}</td>
-                        <td>{{ $a['campaigns'] }}</td>
-                        <td>{{ $a['daily'] }}</td>
-                        <td>
-                            <span class="{{ $a['status'] === 'ok' ? 'badge-profit' : 'badge-loss' }}">{{ $a['status'] }}</span>
-                        </td>
-                        <td style="text-align:left;color:var(--red);white-space:normal;max-width:420px">{{ $a['error'] }}</td>
-                    </tr>
-                    @empty
-                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">No accounts were queried.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        @if (!empty($dbg['errors']))
-        <div style="padding:12px 16px;border-top:1px solid var(--border)">
-            <div style="color:var(--red);font-size:12px;font-weight:600;margin-bottom:6px">All errors ({{ count($dbg['errors']) }}):</div>
-            <ul style="margin:0;padding-left:18px;color:var(--text-muted);font-size:11.5px">
-                @foreach ($dbg['errors'] as $e)<li style="white-space:normal">{{ $e }}</li>@endforeach
+    {{-- Outcome of the most recent sync (saved server-side, so it shows even if the request timed out) --}}
+    @if (!empty($lastRun['finished_at']))
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px">
+        <i class="bi bi-clock-history" style="color:var(--accent-soft)"></i>
+        Last run {{ \Carbon\Carbon::parse($lastRun['finished_at'])->diffForHumans() }}
+        ({{ $lastRun['range'] ?? '' }}):
+        <strong style="color:var(--text-strong)">{{ $lastRun['campaigns'] ?? 0 }}</strong> campaign(s),
+        <strong style="color:var(--text-strong)">{{ $lastRun['daily'] ?? 0 }}</strong> daily row(s),
+        {{ $lastRun['accounts'] ?? 0 }} account(s)
+        @if (!empty($lastRun['errors']))
+        <details style="margin-top:6px">
+            <summary style="cursor:pointer;color:var(--red)">{{ count($lastRun['errors']) }} error(s)</summary>
+            <ul style="margin:6px 0 0;padding-left:18px;font-size:11.5px">
+                @foreach ($lastRun['errors'] as $e)<li style="white-space:normal">{{ $e }}</li>@endforeach
             </ul>
-        </div>
+        </details>
         @endif
     </div>
     @endif
 
-    {{-- Results grouped by account --}}
-    @forelse ($grouped as $accountLabel => $rows)
-    <div class="data-card" style="margin-bottom:18px">
-        <div class="data-card-header">
-            <span><i class="bi bi-building"></i> {{ $accountLabel }}</span>
-            <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} campaign(s)</span>
+    @if ($connections->isEmpty())
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--warn-fg);
+                border-radius:8px;padding:12px 18px;font-size:13px;margin-bottom:18px">
+        <i class="bi bi-exclamation-triangle"></i>
+        No Ad Accounts yet. Add one with credentials on the
+        <a href="{{ url('/connections') }}" style="color:var(--warn-link)">Ad Accounts</a> page first.
+    </div>
+    @endif
+
+    {{-- Filters — same layout as the Dashboard / Analytics filter bars; applies on change --}}
+    @php $shown = $grouped->flatten(1); @endphp
+    <form method="get" action="{{ url('/sync-all') }}" id="syncFilters" class="data-card" style="padding:14px 16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,240px));gap:12px;align-items:end">
+            <div>
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" @selected($status === '')>All</option>
+                    <option value="ENABLED" @selected($status === 'ENABLED')>ENABLED</option>
+                    <option value="REMOVED" @selected($status === 'REMOVED')>REMOVED</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="{{ url('/sync-all') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted)">Reset</a>
+            </div>
         </div>
-        <div class="table-wrap">
-            <table class="ledger" style="width:100%;white-space:nowrap">
+        <div style="margin-top:12px;color:var(--text-muted);font-size:12px">
+            Showing <strong>{{ $status === '' ? 'all' : $status }}</strong> campaigns
+            · {{ $shown->count() }} row(s) across {{ $grouped->count() }} month(s)
+            · Cost {{ $money($shown->sum('cost')) }}
+        </div>
+    </form>
+
+    {{-- Results grouped by month (newest first) — collapsible; current/first month open, rest collapsed --}}
+    @forelse ($grouped as $month => $rows)
+    @php
+        $open      = $loop->first;
+        $monthDate = \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $isCurrent = $month === now()->format('Y-m');
+    @endphp
+    <div class="data-card sync-group" style="margin-bottom:18px">
+        <div class="data-card-header sync-group-toggle" style="cursor:pointer;user-select:none">
+            <span>
+                <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
+                <i class="bi bi-calendar3"></i> {{ $monthDate->format('F Y') }}
+                @if ($isCurrent)<span class="badge-nodata" style="margin-left:6px">Current</span>@endif
+            </span>
+            <span style="color:var(--text-muted);font-size:12px">
+                {{ $rows->count() }} campaign(s) · Cost {{ $money($rows->sum('cost')) }}
+            </span>
+        </div>
+        <div class="table-wrap sync-group-body" style="{{ $open ? '' : 'display:none' }}">
+            <table class="ledger sortable" style="width:100%;white-space:nowrap">
                 <thead>
                     <tr>
                         <th>Campaign</th><th>Status</th><th>Type</th>
@@ -129,7 +121,10 @@
                 <tbody>
                     @foreach ($rows as $s)
                     <tr>
-                        <td style="text-align:left;font-weight:600;color:#fff">{{ $s->campaign_name ?: $s->campaign_id }}</td>
+                        <td style="text-align:left" data-sort="{{ $s->campaign_name ?: $s->campaign_id }}">
+                            <div style="font-weight:600;color:var(--text-strong)">{{ $s->campaign_name ?: $s->campaign_id }}</div>
+                            <div style="color:var(--text-muted);font-size:11px">{{ optional($s->connection)->name }} · {{ $s->account_name ?: $s->customer_id }}</div>
+                        </td>
                         <td><span class="badge-nodata">{{ $s->status ?: '—' }}</span></td>
                         <td>{{ $s->channel_type ?: '—' }}</td>
                         <td>{{ $money($s->cost) }}</td>
@@ -148,9 +143,42 @@
     <div class="data-card">
         <div style="text-align:center;color:var(--text-muted);padding:36px">
             <i class="bi bi-inbox" style="font-size:1.8rem;display:block;margin-bottom:8px"></i>
-            No campaigns synced yet. Click <strong style="color:#fff">Sync All Now</strong> to pull data from Google Ads.
+            @if ($status !== '')
+            No <strong style="color:var(--text-strong)">{{ $status }}</strong> campaigns found.
+            <a href="{{ url('/sync-all') }}" style="color:var(--accent-soft)">Show all</a>
+            @else
+            No campaigns synced yet. Click <strong style="color:var(--text-strong)">Sync All Now</strong> to pull data from Google Ads.
+            @endif
         </div>
     </div>
     @endforelse
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Filters apply instantly (like the Dashboard): picking a status reloads the
+    // page; the bar is dimmed while it loads.
+    document.querySelectorAll('#syncFilters select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            var form = document.getElementById('syncFilters');
+            form.style.opacity = .6; form.style.pointerEvents = 'none';
+            form.submit();
+        });
+    });
+
+    // Collapse / expand each month group. Newest month starts open (−), the rest
+    // collapsed (+); clicking a header toggles that group.
+    document.querySelectorAll('.sync-group-toggle').forEach(function (header) {
+        header.addEventListener('click', function () {
+            var card = header.closest('.sync-group');
+            var body = card.querySelector('.sync-group-body');
+            var icon = header.querySelector('.toggle-icon');
+            var willOpen = body.style.display === 'none';
+            body.style.display = willOpen ? '' : 'none';
+            icon.classList.toggle('bi-dash-square', willOpen);
+            icon.classList.toggle('bi-plus-square', !willOpen);
+        });
+    });
+</script>
 @endsection

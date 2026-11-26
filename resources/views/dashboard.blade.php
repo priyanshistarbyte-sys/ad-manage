@@ -1,25 +1,144 @@
 @extends('layouts.app')
 
+@section('head')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.css">
+<style>
+    /* Date-range input box */
+    .entry-range-filter { position: relative; display: block; }
+    .entry-range-filter .form-control {
+        width: 100%; padding-left: 32px; cursor: pointer;
+        background: var(--card-bg); border: 1px solid var(--border); color: var(--text-strong);
+    }
+    .entry-range-filter .form-control[readonly] { background: var(--card-bg); color: var(--text-strong); }
+    .entry-range-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+        font-size: 13px; color: var(--text-muted); pointer-events: none; }
+
+    /* daterangepicker re-skinned to the ad-manage dark theme */
+    .daterangepicker {
+        background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
+        font-family: inherit; box-shadow: 0 12px 34px var(--shadow-strong); border-radius: 8px;
+    }
+    .daterangepicker:before { border-bottom-color: var(--border); }
+    .daterangepicker:after  { border-bottom-color: var(--card-bg); }
+    .daterangepicker.drop-up:before { border-top-color: var(--border); }
+    .daterangepicker.drop-up:after  { border-top-color: var(--card-bg); }
+    .daterangepicker .calendar-table { background: var(--card-bg); border-color: var(--card-bg); }
+    .daterangepicker.show-ranges.ltr .drp-calendar.left { border-left: 1px solid var(--border); }
+    .daterangepicker .calendar-table th,
+    .daterangepicker .calendar-table td { color: var(--text); border-radius: 6px; }
+    .daterangepicker .calendar-table th.month { color: var(--text-strong); font-weight: 600; }
+    .daterangepicker .calendar-table .next span,
+    .daterangepicker .calendar-table .prev span { border-color: var(--text-muted); }
+    .daterangepicker td.available:hover,
+    .daterangepicker th.available:hover { background: var(--surface-head); color: var(--text-strong); }
+    .daterangepicker td.off,
+    .daterangepicker td.off.in-range,
+    .daterangepicker td.off.start-date,
+    .daterangepicker td.off.end-date { background: transparent; color: var(--text-faint); }
+    .daterangepicker td.disabled, .daterangepicker option.disabled { color: var(--text-faint); opacity: .5; }
+    .daterangepicker td.in-range { background: var(--range-bg); color: var(--text-strong); border-radius: 0; }
+    .daterangepicker td.active, .daterangepicker td.active:hover { background: var(--purple); color: var(--on-accent); }
+    .daterangepicker td.start-date { border-radius: 6px 0 0 6px; }
+    .daterangepicker td.end-date { border-radius: 0 6px 6px 0; }
+    .daterangepicker td.start-date.end-date { border-radius: 6px; }
+    .daterangepicker .ranges li { color: var(--text); border-radius: 6px; margin: 2px 6px; }
+    .daterangepicker .ranges li:hover { background: var(--surface-head); color: var(--text-strong); }
+    .daterangepicker .ranges li.active { background: var(--purple); color: var(--on-accent); }
+    .daterangepicker select.monthselect, .daterangepicker select.yearselect {
+        background: var(--card-bg); color: var(--text); border: 1px solid var(--border);
+        border-radius: 4px; padding: 1px 2px;
+    }
+    .daterangepicker .drp-buttons { border-top: 1px solid var(--border); }
+    .daterangepicker .drp-selected { color: var(--text-muted); }
+    .daterangepicker .drp-buttons .btn { font-size: 12px; padding: 4px 12px; }
+    .daterangepicker .drp-buttons .cancelBtn {
+        background: transparent; color: var(--text); border: 1px solid var(--border);
+    }
+    .daterangepicker .drp-buttons .applyBtn { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
+
+    /* Chart card heading — clean title + divider, no heavy filled bar */
+    .chart-head {
+        display: flex; align-items: center; gap: 8px;
+        font-weight: 700; font-size: 14px; color: var(--text-strong);
+        padding: 2px 0 12px; margin-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    .chart-head i { color: var(--purple); font-size: 15px; }
+</style>
+@endsection
+
 @section('content')
 @php
     $money = fn ($v) => number_format((float) $v, 2);
     $num   = fn ($v) => number_format((float) $v);
     $pct   = fn ($v) => number_format((float) $v, 0) . '%';
+    // Build a querystring carrying the current filters (for drill-in / export links).
+    $q     = fn (array $extra = []) => http_build_query(array_merge(array_filter([
+                'app_id' => $filters['app_id'], 'campaign_id' => $filters['campaign_id'],
+                'geo_id' => $filters['geo_id'], 'from' => $filters['from'], 'to' => $filters['to'],
+            ], fn ($v) => $v !== null && $v !== ''), $extra));
 @endphp
 
-<div style="max-width:1300px;margin:0 auto">
-    <div class="dash-header" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px">
-        <div>
-            <div class="dash-title" style="color:#fff">Welcome{{ currentUserName() !== '' ? ', '.currentUserName() : '' }} 👋</div>
-            <div class="dash-subtitle" style="color:var(--text-muted);font-size:12.5px">
-                {{ \Carbon\Carbon::parse($filters['from'])->format('d M') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
-                @if ($lastSynced) · synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }} @endif
+<div style="max-width:1400px;margin:0 auto">
+
+    {{-- Filters — apply to the KPI cards, every chart, the daily table and the
+         country rankings below. Submitting reloads the dashboard (GET /) so all
+         sections share one filter set. --}}
+    <form method="get" action="{{ url('/') }}" id="dashFilters" class="data-card" style="padding:14px 16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end">
+            <div>
+                <label class="form-label">App</label>
+                <select name="app_id" class="form-select">
+                    <option value="">All apps</option>
+                    @foreach ($options['apps'] as $app)
+                        <option value="{{ $app->id }}" @selected($filters['app_id'] == $app->id)>{{ $app->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Campaign</label>
+                <select name="campaign_id" class="form-select">
+                    <option value="">All campaigns</option>
+                    @foreach ($options['campaigns'] as $c)
+                        <option value="{{ $c->campaign_id }}" @selected($filters['campaign_id'] == $c->campaign_id)>
+                            {{ $c->campaign_name ?: $c->campaign_id }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Country</label>
+                <select name="geo_id" class="form-select">
+                    <option value="">All countries</option>
+                    @foreach ($options['countries'] as $c)
+                        <option value="{{ $c->geo_id }}" @selected($filters['geo_id'] === $c->geo_id)>{{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div style="grid-column:span 1">
+                <label class="form-label">Date range</label>
+                <div class="entry-range-filter">
+                    <i class="bi bi-calendar-range entry-range-icon"></i>
+                    <input type="text" id="dateRange" class="form-control" placeholder="Select date range"
+                           autocomplete="off" readonly title="Filter by date range">
+                </div>
+                <input type="hidden" name="from" id="fromInput" value="{{ $filters['from'] }}">
+                <input type="hidden" name="to"   id="toInput"   value="{{ $filters['to'] }}">
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="{{ url('/') }}" class="btn-sm-custom" style="text-decoration:none;color:var(--text-muted)">Reset</a>
+                <a href="{{ url('/report/export?' . $q()) }}" class="btn-sm-custom" style="background:var(--btn-green);color:var(--on-accent);text-decoration:none">
+                    <i class="bi bi-filetype-csv"></i> Export CSV
+                </a>
             </div>
         </div>
-        <a href="{{ url('/report') }}" class="btn-primary-custom" style="text-decoration:none"><i class="bi bi-table"></i> Full Report</a>
-    </div>
+        <div style="margin-top:12px;color:var(--text-muted);font-size:12px">
+            {{ \Carbon\Carbon::parse($filters['from'])->format('d M Y') }} → {{ \Carbon\Carbon::parse($filters['to'])->format('d M Y') }}
+            @if ($lastSynced) · synced {{ \Carbon\Carbon::parse($lastSynced)->diffForHumans() }} @endif
+        </div>
+    </form>
 
-    {{-- KPI cards --}}
+    {{-- KPI cards (reflect the filters above) --}}
     <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Total Cost</div><div class="kpi-value white">{{ $money($totals->cost) }}</div></div>
         <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value green">{{ $money($totals->total_rev) }}</div></div>
@@ -32,34 +151,154 @@
     @if (!$hasData)
     <div class="data-card" style="text-align:center;padding:40px;color:var(--text-muted)">
         <i class="bi bi-bar-chart-line" style="font-size:2rem;display:block;margin-bottom:10px;color:var(--purple)"></i>
-        No synced data yet. You have {{ $appCount }} app(s) and {{ $connCount }} active Ad Account(s).
-        Head to <a href="{{ url('/sync-all') }}" style="color:#a78bfa">Sync All</a> to pull your first report.
+        No data for these filters. You have {{ $appCount }} app(s) and {{ $connCount }} active Ad Account(s).
+        Head to <a href="{{ url('/sync-all') }}" style="color:var(--accent-soft)">Sync All</a> to pull your first report.
     </div>
     @else
+    {{-- Charts: Cost vs Revenue + TROAS Trend (honour the filters above) --}}
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px" class="dash-grid">
         <div class="data-card" style="padding:16px">
-            <div class="data-card-header" style="border:0;padding:0 0 10px"><span><i class="bi bi-graph-up"></i> Cost vs Revenue</span></div>
+            <div class="chart-head"><i class="bi bi-graph-up"></i> Cost vs Revenue</div>
             <canvas id="costRevChart" height="120"></canvas>
         </div>
         <div class="data-card" style="padding:16px">
-            <div class="data-card-header" style="border:0;padding:0 0 10px"><span><i class="bi bi-activity"></i> TROAS Trend</span></div>
+            <div class="chart-head"><i class="bi bi-activity"></i> TROAS Trend</div>
             <canvas id="troasChart" height="120"></canvas>
         </div>
     </div>
 
+    {{-- Daily performance — grouped by month (newest first), collapsible like Sync All:
+         the first (current) month starts open (−), the rest collapsed (+). --}}
+    @php
+        $monthGroups = $rows->sortByDesc(fn ($r) => \Carbon\Carbon::parse($r->date)->format('Y-m-d'))->groupBy(fn ($r) => \Carbon\Carbon::parse($r->date)->format('Y-m'))->sortKeysDesc();
+    @endphp
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 10px">
+        <span style="font-weight:700;color:var(--text-strong)"><i class="bi bi-calendar3" style="color:var(--purple)"></i> Daily Performance</span>
+        <span style="color:var(--text-muted);font-size:12px">{{ $rows->count() }} day(s) · {{ $monthGroups->count() }} month(s)</span>
+    </div>
+    @forelse ($monthGroups as $month => $mRows)
+    @php
+        $open      = $loop->first;
+        $monthDate = \Carbon\Carbon::createFromFormat('Y-m-d', $month . '-01');
+        $isCurrent = $month === now()->format('Y-m');
+        $mCost     = $mRows->sum('cost');
+        $mAdRev    = $mRows->sum('ad_rev');
+        $mTotRev   = $mRows->sum('total_rev');
+        $mTrial    = $mRows->sum('trial');
+        $mInstall  = $mRows->sum('install');
+        $mTroas    = $mCost > 0 ? $mRows->sum('conversions_value') / $mCost * 100 : 0;
+        $mTrialPct = $mTrial > 0 ? $mRows->sum('trial_convert') / $mTrial * 100 : 0;
+        $mCpi      = $mInstall > 0 ? $mCost / $mInstall : 0;
+    @endphp
+    <div class="data-card daily-group" style="margin-bottom:16px">
+        <div class="data-card-header daily-group-toggle" style="cursor:pointer;user-select:none">
+            <span>
+                <i class="bi {{ $open ? 'bi-dash-square' : 'bi-plus-square' }} toggle-icon" style="color:var(--purple);margin-right:6px"></i>
+                <i class="bi bi-calendar3"></i> {{ $monthDate->format('F Y') }}
+                @if ($isCurrent)<span class="badge-nodata" style="margin-left:6px">Current</span>@endif
+            </span>
+            <span style="color:var(--text-muted);font-size:12px">
+                {{ $mRows->count() }} day(s) · Cost {{ $money($mCost) }} · Rev {{ $money($mTotRev) }} · TROAS {{ $pct($mTroas) }}
+            </span>
+        </div>
+        <div class="table-wrap daily-group-body" style="{{ $open ? '' : 'display:none' }}">
+            <table class="ledger monthly sortable" style="width:100%;white-space:nowrap">
+                <thead>
+                    <tr>
+                        <th>DATE</th><th>COST</th><th>TROAS</th><th>TOTAL_REV</th>
+                        <th>AD_REV</th><th>CONVERT_REV</th><th>RENEW_REV</th>
+                        <th>TRIAL</th><th>TRIAL_CONV%</th><th>REPEAT</th>
+                        <th>INSTALL</th><th>CPI</th><th></th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($mRows as $r)
+                    @php $d = \Carbon\Carbon::parse($r->date)->format('Y-m-d'); @endphp
+                    <tr>
+                        <td data-sort="{{ $d }}">{{ \Carbon\Carbon::parse($r->date)->format('d-m-Y') }}</td>
+                        <td>{{ $money($r->cost) }}</td>
+                        <td><span class="{{ $r->troas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($r->troas) }}</span></td>
+                        <td>{{ $money($r->total_rev) }}</td>
+                        <td>{{ $money($r->ad_rev) }}</td>
+                        <td>{{ $money($r->convert_rev) }}</td>
+                        <td>{{ $money($r->renew_rev) }}</td>
+                        <td>{{ $num($r->trial) }}</td>
+                        <td>{{ $pct($r->trial_convert_perc) }}</td>
+                        <td>{{ $num($r->repeat_count) }}</td>
+                        <td>{{ $num($r->install) }}</td>
+                        <td>{{ $money($r->cpi) }}</td>
+                        <td><button type="button" class="pill drill-btn" style="font:inherit"
+                                data-title="History · {{ \Carbon\Carbon::parse($r->date)->format('d M Y') }}"
+                                data-url="{{ url('/report/history?' . $q(['date' => $d, 'partial' => 1])) }}">VIEW HISTORY</button></td>
+                        <td><button type="button" class="pill drill-btn" style="font:inherit"
+                                data-title="Country · {{ \Carbon\Carbon::parse($r->date)->format('d M Y') }}"
+                                data-url="{{ url('/report/country?' . $q(['date' => $d, 'partial' => 1])) }}">COUNTRY</button></td>
+                    </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>TOTAL</td>
+                        <td>{{ $money($mCost) }}</td>
+                        <td><span class="{{ $mTroas >= 100 ? 'badge-profit' : 'badge-loss' }}">{{ $pct($mTroas) }}</span></td>
+                        <td>{{ $money($mTotRev) }}</td>
+                        <td>{{ $money($mAdRev) }}</td>
+                        <td>{{ $money($mRows->sum('convert_rev')) }}</td>
+                        <td>{{ $money($mRows->sum('renew_rev')) }}</td>
+                        <td>{{ $num($mTrial) }}</td>
+                        <td>{{ $pct($mTrialPct) }}</td>
+                        <td>{{ $num($mRows->sum('repeat_count')) }}</td>
+                        <td>{{ $num($mInstall) }}</td>
+                        <td>{{ $money($mCpi) }}</td>
+                        <td></td><td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    @empty
+    <div class="data-card" style="margin-bottom:16px">
+        <div style="text-align:center;color:var(--text-muted);padding:32px">No data for these filters.</div>
+    </div>
+    @endforelse
+
+    {{-- Country TROAS rankings (honour the filters above) --}}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
-        @foreach (['profit' => ['Top Profit Countries', 'badge-profit'], 'loss' => ['Top Loss Countries', 'badge-loss']] as $key => [$title, $badge])
+        @foreach (['profit' => ['Top Profit Countries (TROAS)', 'bi-graph-up-arrow', 'badge-profit'], 'loss' => ['Top Loss Countries (TROAS)', 'bi-graph-down-arrow', 'badge-loss']] as $key => [$title, $icon, $badge])
         <div class="data-card">
-            <div class="data-card-header"><span>{{ $title }}</span></div>
+            <div class="data-card-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span><i class="bi {{ $icon }}"></i> {{ $title }}</span>
+                @if ($key === 'profit')
+                <select class="rank-sort" style="background:var(--surface-head);border:1px solid var(--border);color:var(--text-muted);
+                        border-radius:6px;padding:3px 8px;font-size:11.5px;cursor:pointer">
+                    <option value="troas:desc">High to Low TROAS</option>
+                    <option value="cost:desc">High to Low Cost</option>
+                    <option value="total_rev:desc">High to Low Total Rev</option>
+                </select>
+                @else
+                <select class="rank-sort" style="background:var(--surface-head);border:1px solid var(--border);color:var(--text-muted);
+                        border-radius:6px;padding:3px 8px;font-size:11.5px;cursor:pointer">
+                    <option value="troas:asc">Low to High TROAS</option>
+                    <option value="cost:desc">High to Low Cost</option>
+                    <option value="total_rev:desc">High to Low Total Rev</option>
+                </select>
+                @endif
+            </div>
             <div class="table-wrap">
                 <table class="ledger" style="width:100%">
                     <thead><tr><th>Country</th><th>Cost</th><th>Total Rev</th><th>TROAS</th></tr></thead>
                     <tbody>
                         @forelse ($ranking[$key] as $c)
-                        <tr><td style="text-align:left">{{ $c->country_name }}</td><td>{{ $money($c->cost) }}</td>
-                            <td>{{ $money($c->total_rev) }}</td><td><span class="{{ $badge }}">{{ $pct($c->troas) }}</span></td></tr>
+                        <tr data-cost="{{ (float) $c->cost }}" data-total_rev="{{ (float) $c->total_rev }}" data-troas="{{ (float) $c->troas }}">
+                            <td style="text-align:left">
+                                <a href="{{ url('/?' . $q(['geo_id' => $c->geo_id])) }}" style="color:var(--text-strong);text-decoration:none">{{ $c->country_name }}</a>
+                            </td>
+                            <td>{{ $money($c->cost) }}</td>
+                            <td>{{ $money($c->total_rev) }}</td>
+                            <td><span class="{{ $badge }}">{{ $pct($c->troas) }}</span></td>
+                        </tr>
                         @empty
-                        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px">No data.</td></tr>
+                        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px">No country data.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -69,29 +308,165 @@
     </div>
     @endif
 </div>
+
+{{-- Drill-in modal: loads the History / Country partials without leaving the dashboard --}}
+<div class="modal fade" id="drillModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border)">
+            <div class="modal-header" style="border-color:var(--border)">
+                <h5 class="modal-title" style="color:var(--text-strong)" id="drillModalTitle"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="drillModalBody"></div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
+{{-- Date-range picker (jQuery + moment + daterangepicker) --}}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.min.js"></script>
+<script>
+    jQuery(function ($) {
+        var $box  = $('#dateRange');
+        var $from = $('#fromInput'), $to = $('#toInput');
+        var start = $from.val() ? moment($from.val(), 'YYYY-MM-DD') : moment().startOf('month');
+        var end   = $to.val()   ? moment($to.val(),   'YYYY-MM-DD') : moment();
+
+        function apply(s, e) {
+            $from.val(s.format('YYYY-MM-DD'));
+            $to.val(e.format('YYYY-MM-DD'));
+            $box.val(s.format('DD MMM YYYY') + ' - ' + e.format('DD MMM YYYY'));
+        }
+
+        $box.daterangepicker({
+            startDate: start,
+            endDate: end,
+            autoUpdateInput: false,
+            showDropdowns: true,
+            alwaysShowCalendars: true,
+            opens: 'left',
+            linkedCalendars: false,
+            ranges: {
+                'Today':        [moment(), moment()],
+                'Yesterday':    [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                'Last 7 Days':  [moment().subtract(6, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                'This Month':   [moment().startOf('month'), moment().endOf('month')],
+                'Last Month':   [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+            },
+            locale: { format: 'DD MMM YYYY', applyLabel: 'Apply', cancelLabel: 'Clear' }
+        });
+
+        apply(start, end); // show the current filter range in the box
+
+        // Applying a range submits the filter form so every section — KPI cards,
+        // charts, the daily table and country rankings — reloads for that range.
+        $box.on('apply.daterangepicker', function (e, p) {
+            apply(p.startDate, p.endDate);
+            $box.closest('form').trigger('submit');
+        });
+
+        // Filters apply instantly: changing any dropdown reloads the dashboard
+        // with the new filter set (the date range does the same on apply, above).
+        // The form is dimmed while the page loads so a double-change isn't lost.
+        $('#dashFilters select').on('change', function () {
+            // A new app gets its own campaign list, so drop a campaign picked for
+            // the previous app (it may not belong to the new one).
+            if (this.name === 'app_id') $('#dashFilters select[name=campaign_id]').val('');
+            $('#dashFilters').css({ opacity: .6, pointerEvents: 'none' }).trigger('submit');
+        });
+
+        // Country ranking: re-sort the rows by the chosen metric + direction
+        // (value is "key:asc" or "key:desc").
+        $('.rank-sort').on('change', function () {
+            var parts = String($(this).val()).split(':');
+            var key   = parts[0];
+            var asc   = parts[1] === 'asc';
+            var $body = $(this).closest('.data-card').find('tbody');
+            var $rows = $body.find('tr').filter(function () {
+                return $(this).data(key) !== undefined;
+            });
+            if (!$rows.length) return;
+            $rows.sort(function (a, b) {
+                var diff = parseFloat($(a).data(key)) - parseFloat($(b).data(key));
+                return asc ? diff : -diff;
+            }).appendTo($body);
+        });
+
+        // Daily Performance month blocks — click a header to expand / collapse it.
+        $(document).on('click', '.daily-group-toggle', function () {
+            var $body = $(this).closest('.daily-group').find('.daily-group-body');
+            var willOpen = !$body.is(':visible');
+            $body.toggle(willOpen);
+            $(this).find('.toggle-icon')
+                .toggleClass('bi-dash-square', willOpen)
+                .toggleClass('bi-plus-square', !willOpen);
+        });
+
+        // Drill-in modal — load the History / Country partial in place instead of
+        // navigating to a separate page.
+        var drillModal = new bootstrap.Modal(document.getElementById('drillModal'));
+        var $drillBody = $('#drillModalBody'), $drillTitle = $('#drillModalTitle');
+
+        $(document).on('click', '.drill-btn', function () {
+            var url = $(this).data('url');
+            $drillTitle.text($(this).data('title') || '');
+            $drillBody.html('<div style="text-align:center;padding:44px;color:var(--text-muted)">' +
+                '<span class="spinner-border spinner-border-sm"></span> Loading…</div>');
+            drillModal.show();
+            $.get(url)
+                .done(function (html) { $drillBody.html(html); })
+                .fail(function () {
+                    $drillBody.html('<div style="text-align:center;padding:44px;color:var(--red)">' +
+                        'Could not load. Please try again.</div>');
+                });
+        });
+    });
+</script>
+
 @if ($hasData)
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-    const gridColor = 'rgba(255,255,255,.06)', tick = '#9aa0b5';
-    const base = { responsive:true, plugins:{legend:{labels:{color:tick}}},
-        scales:{x:{ticks:{color:tick},grid:{color:gridColor}},y:{ticks:{color:tick},grid:{color:gridColor}}} };
+    // Axis/legend colours come from the theme tokens so the charts follow the
+    // light/dark toggle (repainted on the 'themechange' event below).
+    const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const gridColor = css('--chart-grid'), tick = css('--chart-tick');
+    const base = {
+        responsive:true,
+        plugins:{ legend:{
+            position:'top', align:'end',
+            labels:{ color:tick, usePointStyle:true, pointStyle:'circle',
+                     boxWidth:8, boxHeight:8, padding:16, font:{ size:11 } }
+        }},
+        scales:{x:{ticks:{color:tick},grid:{color:gridColor}},y:{ticks:{color:tick},grid:{color:gridColor}}}
+    };
 
-    new Chart(document.getElementById('costRevChart'), {
+    const charts = [];
+    charts.push(new Chart(document.getElementById('costRevChart'), {
         type:'line',
         data:{ labels:@json($chart['labels']),
             datasets:[
                 {label:'Cost', data:@json($chart['costs']), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.15)', tension:.3, fill:true},
                 {label:'Revenue', data:@json($chart['revenue']), borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,.15)', tension:.3, fill:true},
-            ]}, options: base });
+            ]}, options: base }));
 
-    new Chart(document.getElementById('troasChart'), {
+    charts.push(new Chart(document.getElementById('troasChart'), {
         type:'line',
         data:{ labels:@json($chart['labels']),
             datasets:[{label:'TROAS %', data:@json($chart['troas']), borderColor:'#a78bfa', backgroundColor:'rgba(167,139,250,.15)', tension:.3, fill:true}]},
-        options: base });
+        options: base }));
+
+    document.addEventListener('themechange', () => {
+        const g = css('--chart-grid'), t = css('--chart-tick');
+        charts.forEach(c => {
+            c.options.plugins.legend.labels.color = t;
+            ['x', 'y'].forEach(ax => { c.options.scales[ax].ticks.color = t; c.options.scales[ax].grid.color = g; });
+            c.update('none');
+        });
+    });
 </script>
 @endif
 @endsection
